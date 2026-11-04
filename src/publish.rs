@@ -500,7 +500,7 @@ mod tests {
     #[test]
     fn parses_project_list_from_wrangler_debug_output() {
         let text = "noise\nDEBUG: fetching pages projects\nRESPONSE: {\"result\":[{\"name\":\"kandang-test-proj\",\"subdomain\":\"kandang-test-proj.pages.dev\",\"domains\":[\"kandang-test-proj.pages.dev\"]}],\"success\":true}\nmore noise";
-        let projects = parse_project_list(&text);
+        let projects = parse_project_list(text);
         assert_eq!(projects.len(), 1);
         assert_eq!(projects[0].name, "kandang-test-proj");
         assert_eq!(projects[0].subdomain, "kandang-test-proj.pages.dev");
