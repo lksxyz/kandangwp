@@ -602,27 +602,44 @@
     return project ? `https://${project}.pages.dev` : '';
   }
 
+  const PROJECT_NAME = /^[A-Za-z0-9 -]+$/;
+
+  /// Cloudflare Pages only accepts lowercase letters, digits, and dashes, so the
+  /// name typed in the form is kept human and turned into a slug here.
+  function projectSlug(value) {
+    return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  function projectSlugError(raw) {
+    const value = raw.trim();
+    if (!value) return 'Enter a project name first.';
+    if (!PROJECT_NAME.test(value)) return 'Use letters, digits, and spaces only.';
+    if (!projectSlug(value)) return 'Add at least one letter or digit.';
+    return null;
+  }
+
   function publishPanel(d) {
-    const projectInput = el('input', { type: 'text', id: 'pub-project', value: d.settings.project || d.suggested_project || '', placeholder: 'my-project', required: true, pattern: '[a-z0-9-]+', 'aria-describedby': 'pub-project-hint pub-project-status' });
+    const projectInput = el('input', { type: 'text', id: 'pub-project', value: d.settings.project || d.suggested_project || '', placeholder: 'My project', autocomplete: 'off', required: true, pattern: '[A-Za-z0-9 -]+', 'aria-describedby': 'pub-project-hint pub-project-status' });
     const projectStatus = el('span', { class: 'hint', id: 'pub-project-status', role: 'status', text: '' });
     const domainsBlock = el('div', { id: 'pub-domains', class: 'domain-list' });
     let debounce = null;
     function refreshStatus() {
-      const project = projectInput.value.trim();
-      if (!/^[a-z0-9-]+$/.test(project)) {
-        projectStatus.textContent = project ? 'Lowercase letters, digits, and dashes only.' : '';
-        renderDomains(project, null);
+      const error = projectSlugError(projectInput.value);
+      if (error) {
+        projectStatus.textContent = projectInput.value.trim() ? error : '';
+        renderDomains('', null);
         return;
       }
+      const project = projectSlug(projectInput.value);
       if (state.cfProjects === null) {
-        projectStatus.textContent = '';
+        projectStatus.textContent = `Publishing to ${project}`;
         renderDomains(project, null);
         return;
       }
       const existing = state.cfProjects.find((p) => p.name === project);
       projectStatus.textContent = existing
-        ? 'Existing project — publishing updates it.'
-        : 'Available — created on first publish.';
+        ? `Publishing to ${project} — existing project, updates it.`
+        : `Publishing to ${project} — created on first publish.`;
       renderDomains(project, existing || null);
     }
     function renderDomains(project, existing) {
@@ -645,7 +662,7 @@
     projectInput.addEventListener('input', () => {
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => { refreshStatus(); }, 600);
-      renderDomains(projectInput.value.trim(), null);
+      renderDomains(projectSlug(projectInput.value), null);
     });
     projectInput.addEventListener('blur', refreshStatus);
     if (d.cloudflare_connected) {
@@ -653,7 +670,7 @@
     }
     refreshStatus();
     const form = el('form', { class: 'stack', id: 'publish-form', novalidate: true },
-      el('label', { for: 'pub-project' }, 'Cloudflare Pages project', el('span', { class: 'hint', id: 'pub-project-hint', text: 'Lowercase letters, digits, and dashes. Kandang creates the project on the first publish.' })),
+      el('label', { for: 'pub-project' }, 'Project name', el('span', { class: 'hint', id: 'pub-project-hint', text: 'Letters, digits, and spaces. Kandang turns it into a Cloudflare Pages name like my-project and creates it on the first publish.' })),
       projectInput,
       projectStatus,
       el('div', { class: 'btn-row' },
@@ -745,17 +762,17 @@
   }
 
   async function saveSettings(name) {
-    const body = { project: $('pub-project').value.trim() };
-    if (!body.project) { showError('Enter a Cloudflare Pages project name.'); return; }
-    if (!/^[a-z0-9-]+$/.test(body.project)) { showError('The project name uses lowercase letters, digits, and dashes only.'); return; }
+    const error = projectSlugError($('pub-project').value);
+    if (error) { showError(error); return; }
+    const body = { project: projectSlug($('pub-project').value) };
     await run($('pub-save'), () => api('POST', `/api/sites/${encodeURIComponent(name)}/settings`, body), 'Publish settings saved.');
     await openSite(name, 'publish');
   }
 
   async function reviewPublish(name) {
-    const body = { project: $('pub-project').value.trim(), dry_run: true };
-    if (!body.project) { showError('Enter a Cloudflare Pages project name first.'); return; }
-    if (!/^[a-z0-9-]+$/.test(body.project)) { showError('The project name uses lowercase letters, digits, and dashes only.'); return; }
+    const error = projectSlugError($('pub-project').value);
+    if (error) { showError(error); return; }
+    const body = { project: projectSlug($('pub-project').value), dry_run: true };
     const plan = await run($('pub-check'), () => api('POST', `/api/sites/${encodeURIComponent(name)}/publish`, body));
     if (!plan) return;
     const dialog = $('dlg-publish');

@@ -69,6 +69,7 @@ Destructive actions keep one of the six variants and add the `.danger` tone: `so
 
 ## History
 
+- 2026-11-05: The project name field accepts capitals, digits, and spaces; Kandang slugifies it (`Pemda Project 1` → `pemda-project-1`) and shows the generated Cloudflare name under the field.
 - 2026-11-05: Tab strip rebuilt from bare underlines into a segmented bar so the four site sections read as tabs at a glance; Danger zone carries red text, red hover, and a red-soft selected chip. Phones drop the tab icons to keep all four visible.
 - 2026-11-05: Publish and review start the site when it is stopped and leave it running, so the authoring window never disappears mid-publish; the review dialog says so.
 - 2026-11-05: Publish flow redesigned end to end: the review dialog became a ledger with a state-aware primary action, the progress strip gained settled states with **Open live site** / **View log** and an explicit Dismiss, and the Publish tab gained a **Last publish** block. Dashboard publishes now write the deploy manifest, so the deployed address and the changed-file count are real afterwards.

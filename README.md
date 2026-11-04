@@ -34,8 +34,10 @@ kandang export --source http://blog.localhost:18080/ --public https://example.co
 kandang publish blog --public https://example.com --project my-blog
 ```
 
-The Dashboard publish flow asks only for a Cloudflare Pages project name.
-Kandang creates the project on the first publish and uses
+The Dashboard publish flow asks only for a project name. Capitals and spaces
+are fine: Kandang turns the name into a Cloudflare Pages project slug
+(`Pemda Project 1` becomes `pemda-project-1`). Kandang creates the project on
+the first publish and uses
 `https://<project>.pages.dev` as the default public address. To use a custom
 domain, add it in Cloudflare, then enter it under **Custom domain (optional)**
 and publish again. You do not need to create the project or the default URL in
