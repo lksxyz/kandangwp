@@ -384,6 +384,9 @@
   .settings-side { display: grid; gap: 16px; align-content: start; min-width: 0; }
   .side-block { display: grid; gap: 8px; min-width: 0; }
   .domain-list { display: grid; gap: 6px; }
+  .side-block dl.facts .fact { grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 8px 0; }
+  .side-block dl.facts .fact:first-child { padding-top: 0; }
+  .side-block dl.facts .fact:last-child { padding-bottom: 0; }
 
   pre.log {
     margin: 0; padding: 14px 16px;
@@ -417,11 +420,14 @@
   }
 
   .publish-progress {
-    display: flex; align-items: center; gap: 12px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
     background: var(--surface); border: 1px solid var(--line);
     border-radius: var(--radius); padding: 12px 14px; margin-bottom: 16px;
     font-size: 0.875rem;
   }
+  .publish-progress .publish-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .publish-progress .publish-meta { color: var(--muted); font-size: var(--text-micro); font-variant-numeric: tabular-nums; }
+  .publish-progress .status { height: 22px; }
   .publish-progress .spinner {
     width: 14px; height: 14px; flex: none; border-radius: 50%;
     border: 2px solid var(--line-strong); border-top-color: var(--accent);

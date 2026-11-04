@@ -37,6 +37,10 @@ Contrast: white on #1570ef ≈ 4.7:1 (AA); #1158c4 on #f8faff ≈ 5.9:1.
 
 **Overview ledger.** The site Overview is one card split by a full-height hairline into two ledgers, Authoring (site address, preview, admin sign-in) and Publishing (public address, deployed address, project). Each row is a 132px muted label column and a 14px value column, hairline between rows; addresses and the admin user are mono in ink. A missing value stays a muted phrase, and where the fix lives on another tab it carries one accent text action that switches to that tab. Site status appears once, in the page head, never repeated in the card.
 
+**Publish flow.** The review step is a shadow-only dialog carrying the same ledger as Overview — changed files, project, destination. With nothing changed it says so and hides the primary action rather than disabling it, so the only way out is Cancel; with changes it names what will happen and that the result stays on screen.
+
+The strip above the content carries the run: three named phases while it works, then one of two settled states. Done is a green `Published` badge beside the change count (`4 of 12 files changed`, or `Everything was already up to date`) with **Open live site** and Dismiss; failure swaps in the error text with **View log** and Dismiss. Both settled states are terminal — nothing auto-advances. The strip hides after 20 seconds, and is not shown again on a return more than two minutes later; the durable record lives in the Publish tab's **Last publish** block (deployed and preview addresses) and in the Overview's Publishing ledger.
+
 **Preline-informed components** (ported manually to CSS tokens, no Tailwind):
 - Tabs: underline strip, 14px labels, 16px Hugeicons, active accent text + 2px underline.
 - Breadcrumb: `ol` with chevron separators, 14px, current page semibold.
@@ -65,6 +69,7 @@ Destructive actions keep one of the six variants and add the `.danger` tone: `so
 
 ## History
 
+- 2026-11-05: Publish flow redesigned end to end: the review dialog became a ledger with a state-aware primary action, the progress strip gained settled states with **Open live site** / **View log** and an explicit Dismiss, and the Publish tab gained a **Last publish** block. Dashboard publishes now write the deploy manifest, so the deployed address and the changed-file count are real afterwards.
 - 2026-11-05: Site Overview rebuilt as a two-door ledger: one card split by a hairline into Authoring and Publishing, label/value rows replacing the auto-fit fact tiles. Dropped the Status row there (the page head badge already carries it), gave the missing preview and public address a text action into the Publish tab, and switched `dl.facts` to the same ledger on the Engine page.
 - 2026-11-05: Type scale stepped down to the sm/base set: 14px body, 12px meta, 24px h1; dropped the 13px meta step and the 30px h1.
 - 2026-11-05: Dashboard restyled on Preline patterns (manual port, no Tailwind): white sidebar with soft-primary active nav and badge counts, borderless page heads, rounded-md status badges, solid empty states, ringed inputs, shadow-only dialogs.

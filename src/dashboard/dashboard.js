@@ -1,13 +1,16 @@
 (() => {
   const token = document.querySelector('meta[name="kandang-token"]').content;
   const $ = (id) => document.getElementById(id);
-  const state = { sites: [], trash: [], detail: null, tab: 'overview', logTimer: null, autoScroll: true, cfProjects: null, publishTimer: null };
+  const state = { sites: [], trash: [], detail: null, tab: 'overview', logTimer: null, autoScroll: true, cfProjects: null, publishTimer: null, publishSite: null, publishStartedAt: 0 };
 
   const PUBLISH_PHASES = [
     { id: 'starting', label: 'Starting site' },
     { id: 'exporting', label: 'Exporting' },
     { id: 'deploying', label: 'Deploying to Cloudflare' },
   ];
+
+  /// A finished result is worth showing on return, but only while it is fresh.
+  const PUBLISH_RESULT_MS = 10 * 60 * 1000;
 
   function stopPublishPolling() {
     if (state.publishTimer) clearInterval(state.publishTimer);
@@ -20,37 +23,60 @@
     bar.dataset.phase = 'idle';
     bar.hidden = true;
     $('publish-progress-steps').replaceChildren();
-    const close = bar.querySelector('.alert-close');
-    if (close) close.remove();
+    $('publish-progress-actions').replaceChildren();
+  }
+
+  function dismissPublishButton() {
+    return el('button', { class: 'btn sm ghost', type: 'button', onclick: hidePublishProgress }, 'Dismiss');
+  }
+
+  function openPublishLog() {
+    const name = state.publishSite;
+    if (!name) return;
+    const target = `#/sites/${encodeURIComponent(name)}/logs`;
+    if (location.hash === target) openTab('logs'); else location.hash = target;
   }
 
   function renderPublishProgress(job) {
     const bar = $('publish-progress');
     const steps = $('publish-progress-steps');
+    const actions = $('publish-progress-actions');
     bar.hidden = false;
-    let close = bar.querySelector('.alert-close');
-    if (!close) {
-      close = el('button', { class: 'alert-close', type: 'button', 'aria-label': 'Dismiss publish status', text: '\u00D7', onclick: hidePublishProgress });
-      bar.append(close);
-    }
+    bar.dataset.phase = job.phase === 'done' || job.phase === 'error' ? job.phase : 'running';
     if (job.phase === 'error') {
-      bar.dataset.phase = 'error';
       steps.replaceChildren(
         el('span', { class: 'error-text', text: job.error || 'Publish failed.' }),
-        el('span', { class: 'hint', text: ' Check the Logs tab for details.' }),
+        el('span', { class: 'hint', text: 'The deploy log has the full output.' }),
+      );
+      actions.replaceChildren(
+        el('button', { class: 'btn sm white', type: 'button', onclick: openPublishLog }, icon('refresh'), 'View log'),
+        dismissPublishButton(),
       );
       announce(`Publish failed: ${job.error || 'unknown error'}`);
       return;
     }
     if (job.phase === 'done') {
-      bar.dataset.phase = 'done';
-      steps.replaceChildren(el('span', { class: 'step done', text: 'Published' }));
-      announce('Publish finished.');
-      stopPublishPolling();
-      setTimeout(() => { if (bar.dataset.phase === 'done') hidePublishProgress(); }, 6000);
+      steps.replaceChildren(
+        el('span', { class: 'status running', text: 'Published' }),
+        el('span', {
+          class: 'publish-meta',
+          text: job.deployed === false
+            ? 'Everything was already up to date'
+            : `${job.changed} of ${job.files} files changed`,
+        }),
+      );
+      actions.replaceChildren(
+        job.public
+          ? el('a', { class: 'btn sm white', href: job.public, target: '_blank', rel: 'noopener' },
+              icon('external'), 'Open live site', el('span', { class: 'sr-only', text: ' (opens in a new tab)' }))
+          : null,
+        dismissPublishButton(),
+      );
+      announce('Publish finished. The live site is up to date.');
+      setTimeout(() => { if (bar.dataset.phase === 'done') hidePublishProgress(); }, 20000);
       return;
     }
-    bar.dataset.phase = 'running';
+    actions.replaceChildren();
     const current = Math.max(0, PUBLISH_PHASES.findIndex((p) => p.id === job.phase));
     steps.replaceChildren(
       ...PUBLISH_PHASES.map((p, i) => el('span', {
@@ -74,6 +100,13 @@
 
   function watchPublish(name) {
     stopPublishPolling();
+    state.publishSite = name;
+    state.publishStartedAt = Date.now();
+    const settle = (status) => {
+      if (status === 'active') return;
+      stopPublishPolling();
+      refreshAfterPublish(name);
+    };
     pollPublishStatus(name);
     state.publishTimer = setInterval(async () => {
       if (!document.hidden) {
@@ -81,6 +114,25 @@
         if (!active) stopPublishPolling();
       }
     }, 1500);
+  }
+
+  /// A finished publish changes the deployed address, the preview, and the
+  /// saved project, so the panels holding them are updated without touching
+  /// the rest of the form the user may be editing.
+  async function refreshAfterPublish(name) {
+    const r = route();
+    if (r.view !== 'site' || r.name !== name) return;
+    let detail;
+    try {
+      detail = await api('GET', `/api/sites/${encodeURIComponent(name)}`);
+    } catch {
+      return;
+    }
+    state.detail = detail;
+    renderSiteActions(detail);
+    const block = $('pub-last');
+    if (block) block.replaceChildren(...lastPublishedRows(detail));
+    if (state.tab === 'overview') renderPanel();
   }
 
   async function api(method, path, body) {
@@ -185,10 +237,20 @@
 
   function publishDialogChildren(plan) {
     const children = [
-      el('p', { text: `${plan.changed} of ${plan.files} files changed since the last publish.` }),
-      el('p', {}, 'Destination: ', el('span', { class: 'address', text: `${plan.published} → ${plan.project}` })),
+      el('dl', { class: 'facts' },
+        el('div', { class: 'fact' }, el('dt', { text: 'Changed files' }), el('dd', { text: plan.changed === 0 ? 'None' : `${plan.changed} of ${plan.files}` })),
+        el('div', { class: 'fact' }, el('dt', { text: 'Project' }), el('dd', { text: plan.project })),
+        el('div', { class: 'fact' }, el('dt', { text: 'Destination' }), el('dd', {}, el('span', { class: 'address', text: plan.published }))),
+      ),
     ];
-    if (plan.changed === 0) children.push(el('p', { class: 'muted', text: 'Nothing has changed, so nothing will be deployed.' }));
+    if (plan.changed === 0) {
+      children.push(el('p', { class: 'notice-line' },
+        'Nothing changed since the last publish, so nothing will be uploaded. ',
+        el('a', { href: plan.published, target: '_blank', rel: 'noopener' },
+          'Open the live site', el('span', { class: 'sr-only', text: ' (opens in a new tab)' }))));
+    } else {
+      children.push(el('p', { class: 'hint', style: 'margin:0', text: 'Kandang exports the site again, then deploys it. Progress and the result stay at the top of the page, so you can keep working.' }));
+    }
     return children;
   }
 
@@ -370,6 +432,15 @@
   function addressLink(href) {
     return el('a', { class: 'address', href, target: '_blank', rel: 'noopener', text: href },
       el('span', { class: 'sr-only', text: ' (opens in a new tab)' }));
+  }
+
+  /// Where the last publish landed: the two addresses that exist only once the
+  /// site has been exported and deployed.
+  function lastPublishedRows(d) {
+    return [
+      fact('Deployed', d.deployed ? addressLink(d.deployed) : missing('Not published yet', null)),
+      fact('Preview', d.preview_url ? addressLink(d.preview_url) : missing('Not exported yet', null)),
+    ];
   }
 
   function overviewPanel(d) {
@@ -589,8 +660,8 @@
         el('aside', { class: 'settings-side' },
           el('section', { class: 'side-block' }, el('h3', { text: 'Domains' }), domainsBlock),
           el('section', { class: 'side-block' },
-            el('h3', { text: 'Export' }),
-            el('p', { class: 'muted', style: 'margin:0', text: d.exported ? 'Last export is available for preview.' : 'Nothing exported yet.' })),
+            el('h3', { text: 'Last publish' }),
+            el('dl', { class: 'facts', id: 'pub-last' }, lastPublishedRows(d))),
         ),
       ),
     );
@@ -675,12 +746,14 @@
     const plan = await run($('pub-check'), () => api('POST', `/api/sites/${encodeURIComponent(name)}/publish`, body));
     if (!plan) return;
     const dialog = $('dlg-publish');
+    const ok = $('dlg-publish-ok');
     $('dlg-publish-body').replaceChildren(...publishDialogChildren(plan));
-    $('dlg-publish-ok').disabled = plan.changed === 0;
+    ok.hidden = plan.changed === 0;
     const confirmed = await new Promise((resolve) => {
       dialog.addEventListener('close', () => resolve(dialog.returnValue === 'ok'), { once: true });
       dialog.showModal();
     });
+    ok.hidden = false;
     if (!confirmed) return;
     renderPublishProgress({ phase: 'starting' });
     watchPublish(name);
