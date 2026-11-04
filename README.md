@@ -89,6 +89,10 @@ keyring.
   bar) the applet has nowhere to appear. Use the CLI there.
 - The dashboard needs the browser only; nothing is installed system-wide.
 
+## License
+
+MIT, see [LICENSE](LICENSE).
+
 ## More
 
 - [GLOSSARY.md](GLOSSARY.md) — the words this project uses.
