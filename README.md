@@ -16,6 +16,10 @@ See [GLOSSARY.md](GLOSSARY.md) and [docs/adr/](docs/adr/) for the design, and
 
 Open `http://localhost:10042/` (or `kandang open`). From there you can create,
 start, stop, publish, and view logs for sites, and move them to the Trash.
+
+The create dialog takes a readable project name — capitals, digits, and spaces
+are fine — and derives the site name from it: `Project Pemda 01` becomes the
+site `project-pemda-01` at `http://project-pemda-01.localhost:18080`.
 Purging a trashed site asks you to type its name.
 
 The Dashboard's actions use a per-run token and a Host check. See

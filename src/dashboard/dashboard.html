@@ -161,10 +161,11 @@
     <div id="create-form-fields">
       <div class="field">
         <label for="create-name">
-          Site name
-          <span class="hint" id="create-name-hint">Lowercase letters, digits, and dashes. Example: client-blog</span>
+          Project name
+          <span class="hint" id="create-name-hint">Letters, digits, and spaces. Example: Project Pemda 01</span>
         </label>
-        <input type="text" id="create-name" name="name" autocomplete="off" required pattern="[a-z0-9-]+" aria-describedby="create-name-hint create-name-error" aria-invalid="false">
+        <input type="text" id="create-name" name="name" autocomplete="off" required pattern="[A-Za-z0-9 -]+" aria-describedby="create-name-hint create-name-status create-name-error" aria-invalid="false">
+        <span class="hint" id="create-name-status" role="status"></span>
         <span class="field-error" id="create-name-error" hidden></span>
       </div>
       <div class="field">

@@ -983,12 +983,22 @@
 
   // Create-site dialog
   const createDialog = $('dlg-create');
+
+  /// The dialog takes a readable name; the site itself is the slug of it.
+  function refreshCreateName() {
+    const raw = $('create-name').value;
+    const slug = projectSlug(raw);
+    const invalid = raw.trim() && projectSlugError(raw);
+    $('create-name-status').textContent = invalid || !slug ? '' : `Site name: ${slug}`;
+  }
+
   function openCreate() {
     $('create-form').reset();
     $('create-form-fields').hidden = false;
     $('create-result').hidden = true;
     $('create-submit').hidden = false;
     $('create-done').hidden = true;
+    $('create-name-status').textContent = '';
     for (const id of ['create-name', 'create-port']) {
       $(id).setAttribute('aria-invalid', 'false');
     }
@@ -1000,15 +1010,18 @@
   $('open-create').addEventListener('click', openCreate);
   $('open-create-empty').addEventListener('click', openCreate);
   $('create-cancel').addEventListener('click', () => createDialog.close());
+  $('create-name').addEventListener('input', refreshCreateName);
 
   $('create-form').addEventListener('submit', async (event) => {
     event.preventDefault();
-    const name = $('create-name').value.trim();
+    const rawName = $('create-name').value;
+    const name = projectSlug(rawName);
     const portValue = $('create-port').value.trim();
     const nameError = $('create-name-error');
-    if (!/^[a-z0-9-]+$/.test(name)) {
+    const slugError = projectSlugError(rawName);
+    if (slugError) {
       $('create-name').setAttribute('aria-invalid', 'true');
-      nameError.textContent = 'Use lowercase letters, digits, and dashes only.';
+      nameError.textContent = slugError;
       nameError.hidden = false;
       $('create-name').focus();
       return;
@@ -1034,9 +1047,15 @@
       announce(`${site.name} created.`);
       await loadSites();
     } catch (e) {
-      $('create-port-error').textContent = e.message;
-      $('create-port-error').hidden = false;
-      $('create-port').setAttribute('aria-invalid', 'true');
+      if (/site named|site names/.test(e.message)) {
+        nameError.textContent = e.message;
+        nameError.hidden = false;
+        $('create-name').setAttribute('aria-invalid', 'true');
+      } else {
+        $('create-port-error').textContent = e.message;
+        $('create-port-error').hidden = false;
+        $('create-port').setAttribute('aria-invalid', 'true');
+      }
       announce(`Error: ${e.message}`);
     } finally {
       submit.disabled = false;
@@ -1044,7 +1063,7 @@
   });
   $('create-done').addEventListener('click', () => {
     createDialog.close();
-    location.hash = `#/sites/${encodeURIComponent($('create-name').value.trim())}/overview`;
+    location.hash = `#/sites/${encodeURIComponent(projectSlug($('create-name').value))}/overview`;
   });
 
   // Tabs: arrow keys, Home, End
