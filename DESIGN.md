@@ -35,6 +35,8 @@ Contrast: white on #1570ef ≈ 4.7:1 (AA); #1158c4 on #f8faff ≈ 5.9:1.
 
 **Structure.** Fixed sidebar on white with soft-primary active nav item and pill badge counts, engine status foot. Content: h1 + primary action top-right, white panels radius 12px with hairline borders — border or shadow, never both. Statusbar at the page foot.
 
+**Overview ledger.** The site Overview is one card split by a full-height hairline into two ledgers, Authoring (site address, preview, admin sign-in) and Publishing (public address, deployed address, project). Each row is a 132px muted label column and a 14px value column, hairline between rows; addresses and the admin user are mono in ink. A missing value stays a muted phrase, and where the fix lives on another tab it carries one accent text action that switches to that tab. Site status appears once, in the page head, never repeated in the card.
+
 **Preline-informed components** (ported manually to CSS tokens, no Tailwind):
 - Tabs: underline strip, 14px labels, 16px Hugeicons, active accent text + 2px underline.
 - Breadcrumb: `ol` with chevron separators, 14px, current page semibold.
@@ -63,6 +65,7 @@ Destructive actions keep one of the six variants and add the `.danger` tone: `so
 
 ## History
 
+- 2026-11-05: Site Overview rebuilt as a two-door ledger: one card split by a hairline into Authoring and Publishing, label/value rows replacing the auto-fit fact tiles. Dropped the Status row there (the page head badge already carries it), gave the missing preview and public address a text action into the Publish tab, and switched `dl.facts` to the same ledger on the Engine page.
 - 2026-11-05: Type scale stepped down to the sm/base set: 14px body, 12px meta, 24px h1; dropped the 13px meta step and the 30px h1.
 - 2026-11-05: Dashboard restyled on Preline patterns (manual port, no Tailwind): white sidebar with soft-primary active nav and badge counts, borderless page heads, rounded-md status badges, solid empty states, ringed inputs, shadow-only dialogs.
 - 2026-11-04: Buttons rebuilt on the six-variant recipe (Solid/Outline/Ghost/Soft/White/Link) with a `.danger` tone and Hugeicons icons; retired `primary`, `danger`, and `danger-solid` classes.

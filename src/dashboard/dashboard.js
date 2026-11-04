@@ -351,28 +351,45 @@
     if (state.tab === 'danger') panel.replaceChildren(dangerPanel(detail));
   }
 
-  function fact(label, value) {
-    return el('div', { class: 'fact' }, el('dt', { text: label }), el('dd', {}, value));
+  function fact(label, ...value) {
+    return el('div', { class: 'fact' }, el('dt', { text: label }), el('dd', {}, ...value));
+  }
+
+  function openTab(tab) {
+    setTab(tab, true);
+    renderPanel();
+  }
+
+  function missing(text, action, tab) {
+    return el('span', { class: 'missing' },
+      el('span', { text }),
+      action ? el('button', { class: 'text-action', type: 'button', onclick: () => openTab(tab) }, action) : null,
+    );
+  }
+
+  function addressLink(href) {
+    return el('a', { class: 'address', href, target: '_blank', rel: 'noopener', text: href },
+      el('span', { class: 'sr-only', text: ' (opens in a new tab)' }));
   }
 
   function overviewPanel(d) {
-    return el('div', { class: 'panel' },
+    const publicAddress = d.settings.public || defaultPublic(d.settings.project);
+    return el('div', { class: 'panel overview' },
       el('section', { class: 'fact-group' },
-        el('h3', { text: 'Site' }),
+        el('h3', { text: 'Authoring' }),
         el('dl', { class: 'facts' },
-          fact('Status', statusNode(d.running)),
-          fact('Site address', el('span', { class: 'address' }, el('a', { href: d.url, target: '_blank', rel: 'noopener', text: d.url }, el('span', { class: 'sr-only', text: ' (opens in a new tab)' })))),
-          fact('Admin user', el('code', { text: 'admin' })),
+          fact('Site address', addressLink(d.url)),
+          fact('Preview', d.preview_url ? addressLink(d.preview_url) : missing('Not exported yet', 'Publish', 'publish')),
+          fact('Admin user', el('code', { class: 'address', text: 'admin' })),
           fact('Admin password', adminPasswordCell(d.name)),
-          fact('Preview', d.preview_url ? el('a', { href: d.preview_url, target: '_blank', rel: 'noopener', text: d.preview_url }, el('span', { class: 'sr-only', text: ' (opens in a new tab)' })) : el('span', { class: 'muted', text: 'Not exported yet. Publish once to create a preview.' })),
         ),
       ),
       el('section', { class: 'fact-group' },
         el('h3', { text: 'Publishing' }),
         el('dl', { class: 'facts' },
-          fact('Public address', (d.settings.public || defaultPublic(d.settings.project)) ? el('span', { class: 'address', text: d.settings.public || defaultPublic(d.settings.project) }) : el('span', { class: 'muted', text: 'Not set. Add a project in Publish.' })),
-          fact('Deployed address', d.deployed ? el('a', { href: d.deployed, target: '_blank', rel: 'noopener', text: d.deployed }, el('span', { class: 'sr-only', text: ' (opens in a new tab)' })) : el('span', { class: 'muted', text: 'Not published yet.' })),
-          fact('Cloudflare project', d.settings.project ? el('span', { text: d.settings.project }) : el('span', { class: 'muted', text: 'Not set.' })),
+          fact('Public address', publicAddress ? el('span', { class: 'address', text: publicAddress }) : missing('Not set', 'Set up', 'publish')),
+          fact('Deployed address', d.deployed ? addressLink(d.deployed) : missing('Not published yet', null)),
+          fact('Cloudflare project', d.settings.project ? el('span', { text: d.settings.project }) : missing('Not set', null)),
         ),
       ),
     );
