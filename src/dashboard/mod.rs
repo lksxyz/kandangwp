@@ -390,13 +390,12 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
                     .unwrap_or_else(|e| e.into_inner())
                     .insert(name.to_string(), PublishJob::running("starting"));
             }
+            // Exporting needs the site server. Starting it is part of the
+            // publish and the site stays up afterwards, so the authoring
+            // window the user is working in does not disappear.
             let setup = (|| -> Result<()> {
-                let started_here = start(state, name)?;
-                let exported = publish::export_site(name, &public);
-                if started_here {
-                    stop(state, name)?;
-                }
-                exported.map(|_| ())
+                start(state, name)?;
+                publish::export_site(name, &public).map(|_| ())
             })();
             if let Err(e) = setup {
                 if !dry_run {
@@ -432,13 +431,9 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
                 };
                 let outcome = (|| {
                     set_phase("starting");
-                    let started_here = start(&state, &job_name)?;
+                    start(&state, &job_name)?;
                     set_phase("exporting");
-                    let exported = publish::export_site(&job_name, &job_public);
-                    if started_here {
-                        let _ = stop(&state, &job_name);
-                    }
-                    exported?;
+                    publish::export_site(&job_name, &job_public)?;
                     set_phase("deploying");
                     let log = publish::log_path(&job_name)?;
                     publish::deploy_if_changed_logged(&job_name, &job_public, &job_project, log)

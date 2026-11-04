@@ -79,6 +79,10 @@ Publishing only deploys when something changed. Each publish stores a hash
 manifest in the site folder, and an unchanged site is reported as "nothing
 deployed". Cloudflare also dedupes uploads by hash.
 
+Publishing needs the site server for the export, so **Review and publish**
+starts a stopped site first and leaves it running afterwards. You do not have
+to start the site before publishing.
+
 Sites are reached at `http://<name>.localhost:18080`, served by the engine's
 gateway. See [ADR-0010](docs/adr/0010-localhost-subdomains-through-a-gateway.md).
 

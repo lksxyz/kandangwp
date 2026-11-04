@@ -10,7 +10,10 @@
   ];
 
   /// A finished result is worth showing on return, but only while it is fresh.
-  const PUBLISH_RESULT_MS = 10 * 60 * 1000;
+  const PUBLISH_RESULT_MS = 2 * 60 * 1000;
+  /// The publish request claims its job server-side a moment after the click,
+  /// so an idle status right after starting is not proof that it never began.
+  const PUBLISH_START_GRACE_MS = 8000;
 
   function stopPublishPolling() {
     if (state.publishTimer) clearInterval(state.publishTimer);
@@ -87,14 +90,26 @@
     announce(`Publishing: ${PUBLISH_PHASES[current].label}.`);
   }
 
+  /// Reports what the strip should do next: `active` covers every in-flight
+  /// phase, `done` and `error` are terminal, and `idle`/`stale`/`unknown` mean
+  /// there is nothing left to watch.
   async function pollPublishStatus(name) {
     try {
       const job = await api('GET', `/api/sites/${encodeURIComponent(name)}/publish/status`);
-      if (job.phase === 'idle') { hidePublishProgress(); return false; }
+      if (job.phase === 'idle') {
+        if (state.publishSite === name && Date.now() - state.publishStartedAt < PUBLISH_START_GRACE_MS) return 'active';
+        hidePublishProgress();
+        return 'idle';
+      }
+      if (job.finished_at && job.finished_at * 1000 < Date.now() - PUBLISH_RESULT_MS) {
+        hidePublishProgress();
+        return 'stale';
+      }
+      state.publishSite = name;
       renderPublishProgress(job);
-      return job.phase !== 'done' && job.phase !== 'error';
+      return job.phase === 'done' || job.phase === 'error' ? job.phase : 'active';
     } catch {
-      return false;
+      return 'unknown';
     }
   }
 
@@ -107,12 +122,10 @@
       stopPublishPolling();
       refreshAfterPublish(name);
     };
-    pollPublishStatus(name);
+    pollPublishStatus(name).then(settle);
     state.publishTimer = setInterval(async () => {
-      if (!document.hidden) {
-        const active = await pollPublishStatus(name);
-        if (!active) stopPublishPolling();
-      }
+      if (document.hidden) return;
+      settle(await pollPublishStatus(name));
     }, 1500);
   }
 
@@ -249,7 +262,7 @@
         el('a', { href: plan.published, target: '_blank', rel: 'noopener' },
           'Open the live site', el('span', { class: 'sr-only', text: ' (opens in a new tab)' }))));
     } else {
-      children.push(el('p', { class: 'hint', style: 'margin:0', text: 'Kandang exports the site again, then deploys it. Progress and the result stay at the top of the page, so you can keep working.' }));
+      children.push(el('p', { class: 'hint', style: 'margin:0', text: 'Kandang starts the site if it is not running, exports it, then deploys. The site stays running afterwards, and the result stays at the top of the page.' }));
     }
     return children;
   }
@@ -364,7 +377,7 @@
     setTab(tab, false);
     renderPanel();
     // Surface an in-flight or just-finished publish when the user returns.
-    pollPublishStatus(detail.name).then((active) => { if (active) watchPublish(detail.name); });
+    pollPublishStatus(detail.name).then((status) => { if (status === 'active') watchPublish(detail.name); });
   }
 
   function renderSiteActions(detail) {

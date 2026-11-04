@@ -69,6 +69,7 @@ Destructive actions keep one of the six variants and add the `.danger` tone: `so
 
 ## History
 
+- 2026-11-05: Publish and review start the site when it is stopped and leave it running, so the authoring window never disappears mid-publish; the review dialog says so.
 - 2026-11-05: Publish flow redesigned end to end: the review dialog became a ledger with a state-aware primary action, the progress strip gained settled states with **Open live site** / **View log** and an explicit Dismiss, and the Publish tab gained a **Last publish** block. Dashboard publishes now write the deploy manifest, so the deployed address and the changed-file count are real afterwards.
 - 2026-11-05: Site Overview rebuilt as a two-door ledger: one card split by a hairline into Authoring and Publishing, label/value rows replacing the auto-fit fact tiles. Dropped the Status row there (the page head badge already carries it), gave the missing preview and public address a text action into the Publish tab, and switched `dl.facts` to the same ledger on the Engine page.
 - 2026-11-05: Type scale stepped down to the sm/base set: 14px body, 12px meta, 24px h1; dropped the 13px meta step and the 30px h1.
