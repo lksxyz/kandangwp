@@ -1,0 +1,79 @@
+# Glossary — Kandang
+
+Canonical vocabulary for **Kandang** (depot/holding pens for local WordPress
+sites). Terms are domain-level only — no
+implementation details. Implementation choices live in `docs/adr/`.
+
+---
+
+## Control Applet
+
+The desktop affordance for the product: a small, always-available control that
+lives in the desktop environment's **status area** (wherever volume, network,
+and brightness controls live for that DE/WM). Parity of feeling: "like the wifi
+toggle".
+
+It offers exactly: **turn the Engine on/off** and **open the Dashboard**.
+
+The DE's native mechanism varies (some call it a system tray, some use a
+quick-settings panel, tiling WMs show it inside a status bar). "Tray icon" is a
+colloquial word for it on tray-capable DEs, not the canonical term.
+
+**Not** the Engine. It can disappear without the Engine stopping.
+
+## Engine
+
+The headless local service that does all the work: serves the Dashboard and
+every WordPress-development capability on `localhost`. It has no visible UI of
+its own other than the Dashboard in a browser.
+
+Has exactly two user-visible states: **Running** and **Stopped**.
+
+## Dashboard
+
+The browser-based UI served by the Engine. It is the product's entire visual
+surface; there is no native (widget-based) settings or management UI. Opened
+from the Control Applet or by typing the local URL.
+
+## Site
+
+A local WordPress installation that Kandang manages. A Site has a name, a
+address on the local machine (its **Domain**), and its own files and database.
+Sites are created, started, stopped, opened, and deleted from the Dashboard.
+
+A Site is either **Running** (reachable at its Domain) or **Stopped**.
+
+## Domain
+
+The address a Site is reached at in the browser, e.g. `mysite.localhost`. Domains
+are on the `.localhost` top-level domain, which browsers send to the local machine
+without configuration. The engine's gateway routes each Domain to its Site.
+
+## Export
+
+Producing a static copy of a Site's pages, assets, and media from its running
+local version. Export never changes the local Site.
+
+## Publish
+
+Exporting a Site and making the result live at its Public Address.
+
+## Public Address
+
+The address visitors use for a published Site, e.g. `https://example.com`. It
+differs from the local Domain, and Publish rewrites links to it.
+
+## Trash
+
+Where a deleted Site goes first. A Site in the Trash can be restored until it is
+purged. Deleting a Site never removes its data immediately.
+
+## Status Area
+
+The desktop-specific region where system-level controls (volume, network,
+power) live on a given DE/WM: e.g. the system tray / notification area on
+Plasma, the shell panel on GNOME, the bar's tray zone on tiling WMs. The place
+where the Control Applet appears.
+
+User base note: users on a DE/WM without a Status Area provider (no tray bar,
+no extension) use the CLI instead of the Control Applet.

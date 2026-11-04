@@ -1,0 +1,9 @@
+node_modules
+dist
+.alchemy
+.env
+.dev.vars
+/target
+.wrangler/
+.pi/
+.impeccable/

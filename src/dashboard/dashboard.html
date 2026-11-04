@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="kandang-token" content="__TOKEN__">
+<title>Kandang</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/dashboard.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Main">
+    <div class="sidebar-head">
+      <a class="brand" href="#/sites">Kandang</a>
+      <button class="nav-close" type="button" id="nav-close" aria-label="Close navigation">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <nav aria-label="Sections">
+      <ul>
+        <li>
+          <a href="#/sites" data-nav="sites">
+            <span class="nav-icon" data-icon="sites" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8 12c0 6 4 10 4 10s4-4 4-10s-4-10-4-10s-4 4-4 10Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 15H3m18-6H3"/></svg></span>
+            <span>Sites</span>
+            <span class="count" id="count-sites"></span>
+          </a>
+        </li>
+        <li>
+          <a href="#/trash" data-nav="trash">
+            <span class="nav-icon" data-icon="trash" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m19.5 5.5l-.62 10.025c-.158 2.561-.237 3.842-.88 4.763a4 4 0 0 1-1.2 1.128c-.957.584-2.24.584-4.806.584c-2.57 0-3.855 0-4.814-.585a4 4 0 0 1-1.2-1.13c-.642-.922-.72-2.205-.874-4.77L4.5 5.5M3 5.5h18m-4.944 0l-.683-1.408c-.453-.936-.68-1.403-1.071-1.695a2 2 0 0 0-.275-.172C13.594 2 13.074 2 12.035 2c-1.066 0-1.599 0-2.04.234a2 2 0 0 0-.278.18c-.395.303-.616.788-1.058 1.757L8.053 5.5m1.447 11v-6m5 6v-6"/></svg></span>
+            <span>Trash</span>
+            <span class="count" id="count-trash"></span>
+          </a>
+        </li>
+        <li>
+          <a href="#/cloudflare" data-nav="cloudflare">
+            <span class="nav-icon" data-icon="cloudflare" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path stroke-linejoin="round" d="M12.828 6.001a3 3 0 1 0-5.658 0c-2.285.008-3.504.09-4.292.878S2.008 8.886 2 11.17a3 3 0 1 1 0 5.66c.008 2.284.09 3.503.878 4.291s2.007.87 4.291.878a3 3 0 1 1 5.66 0c2.284-.008 3.503-.09 4.291-.878s.87-2.007.878-4.292a3 3 0 1 0 0-5.658c-.008-2.285-.09-3.504-.878-4.292c-.788-.789-2.007-.87-4.292-.878Z"/></svg></span>
+            <span>Integrations</span>
+          </a>
+        </li>
+        <li>
+          <a href="#/engine" data-nav="engine">
+            <span class="nav-icon" data-icon="engine" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 4H5c-.932 0-1.398 0-1.765.152a2 2 0 0 0-1.083 1.083C2 5.602 2 6.068 2 7s0 1.398.152 1.765a2 2 0 0 0 1.083 1.083C3.602 10 4.068 10 5 10h14c.932 0 1.398 0 1.765-.152a2 2 0 0 0 1.083-1.083C22 8.398 22 7.932 22 7s0-1.398-.152-1.765a2 2 0 0 0-1.083-1.083C20.398 4 19.932 4 19 4m0 10H5c-.932 0-1.398 0-1.765.152a2 2 0 0 0-1.083 1.083C2 15.602 2 16.068 2 17s0 1.398.152 1.765a2 2 0 0 0 1.083 1.083C3.602 20 4.068 20 5 20h14c.932 0 1.398 0 1.765-.152a2 2 0 0 0 1.083-1.083C22 18.398 22 17.932 22 17s0-1.398-.152-1.765a2 2 0 0 0-1.083-1.083C20.398 14 19.932 14 19 14"/><path d="M6.125 7H6m.25 0a.25.25 0 1 1-.5 0a.25.25 0 0 1 .5 0m3.875 0H10m.25 0a.25.25 0 1 1-.5 0a.25.25 0 0 1 .5 0M6.125 17H6m.25 0a.25.25 0 1 1-.5 0a.25.25 0 0 1 .5 0m3.875 0H10m.25 0a.25.25 0 1 1-.5 0a.25.25 0 0 1 .5 0"/></svg></span>
+            <span>Engine</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </aside>
+
+  <div class="content">
+  <div class="mobile-bar">
+    <button class="btn sm white nav-open" type="button" id="nav-open" aria-controls="sidebar" aria-expanded="false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span>Menu</span>
+    </button>
+    <span class="mobile-brand">Kandang</span>
+  </div>
+  <button class="sidebar-backdrop" type="button" id="nav-backdrop" aria-label="Close navigation" tabindex="-1" hidden></button>
+  <main id="main" tabindex="-1">
+    <p id="status" class="sr-only" role="status" aria-live="polite"></p>
+    <div id="error" class="alert" role="alert" hidden>
+      <span id="error-text"></span>
+      <button class="alert-close" type="button" aria-label="Dismiss error" onclick="dismissError()">&#215;</button>
+    </div>
+    <div id="publish-progress" class="publish-progress" data-phase="idle" role="status" aria-live="polite" hidden>
+      <span class="spinner" aria-hidden="true"></span>
+      <span class="steps" id="publish-progress-steps"></span>
+    </div>
+
+    <section id="view-sites" aria-labelledby="h-sites" hidden>
+      <div class="page-head">
+        <h1 id="h-sites" tabindex="-1">Sites</h1>
+        <p class="sub" id="sites-summary"></p>
+        <div class="btn-row">
+          <button class="btn solid" type="button" id="open-create"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4v16m8-8H4"/></svg>New site</button>
+        </div>
+      </div>
+      <p class="label" id="sites-label" hidden>Local sites</p>
+      <div id="sites-empty" class="empty" hidden>
+        <span class="empty-mark" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/></svg>
+        </span>
+        <p class="empty-title">No sites yet</p>
+        <p class="empty-hint">Create a local WordPress site to author in, then publish it as fast static files.</p>
+        <p><button class="btn solid" type="button" id="open-create-empty"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4v16m8-8H4"/></svg>Create your first site</button></p>
+      </div>
+      <ul class="list" id="sites-list" aria-label="Local WordPress sites" hidden></ul>
+    </section>
+
+    <section id="view-site" aria-labelledby="h-site" hidden>
+      <ol class="breadcrumb">
+        <li>
+          <a href="#/sites">Sites<svg class="crumb-sep" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg></a>
+        </li>
+        <li class="crumb-current" id="crumb-name" aria-current="page"></li>
+      </ol>
+      <div class="page-head">
+        <h1 id="h-site" tabindex="-1"></h1>
+        <div class="btn-row" id="site-actions"></div>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Site sections" id="tabs">
+        <button class="tab" role="tab" id="tab-overview" aria-controls="panel" data-tab="overview" aria-selected="true" tabindex="0"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.5 8.75v-2c0-1.644 0-2.466-.454-3.019a2 2 0 0 0-.277-.277C9.216 3 8.394 3 6.75 3s-2.466 0-3.019.454a2 2 0 0 0-.277.277C3 4.284 3 5.106 3 6.75v2c0 1.644 0 2.466.454 3.019q.125.152.277.277c.553.454 1.375.454 3.019.454s2.466 0 3.019-.454q.152-.125.277-.277c.454-.553.454-1.375.454-3.019ZM7.75 15.5h-2c-.698 0-1.047 0-1.33.086a2 2 0 0 0-1.334 1.333C3 17.203 3 17.552 3 18.25s0 1.047.086 1.33a2 2 0 0 0 1.333 1.334C4.703 21 5.052 21 5.75 21h2c.698 0 1.047 0 1.33-.086a2 2 0 0 0 1.334-1.333c.086-.284.086-.633.086-1.331s0-1.047-.086-1.33a2 2 0 0 0-1.333-1.334c-.284-.086-.633-.086-1.331-.086ZM21 17.25v-2c0-1.644 0-2.466-.454-3.019a2 2 0 0 0-.277-.277c-.553-.454-1.375-.454-3.019-.454s-2.466 0-3.019.454a2 2 0 0 0-.277.277c-.454.553-.454 1.375-.454 3.019v2c0 1.644 0 2.466.454 3.019q.125.152.277.277c.553.454 1.375.454 3.019.454s2.466 0 3.019-.454q.152-.125.277-.277C21 19.716 21 18.894 21 17.25ZM18.25 3h-2c-.698 0-1.047 0-1.33.086a2 2 0 0 0-1.334 1.333c-.086.284-.086.633-.086 1.331s0 1.047.086 1.33a2 2 0 0 0 1.333 1.334c.284.086.633.086 1.331.086h2c.698 0 1.047 0 1.33-.086a2 2 0 0 0 1.334-1.333C21 6.797 21 6.448 21 5.75s0-1.047-.086-1.33a2 2 0 0 0-1.333-1.334C19.297 3 18.948 3 18.25 3Z"/></svg>Overview</button>
+        <button class="tab" role="tab" id="tab-logs" aria-controls="panel" data-tab="logs" aria-selected="false" tabindex="-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 17s6-4.419 6-6s-6-6-6-6m8 14h8"/></svg>Logs</button>
+        <button class="tab" role="tab" id="tab-publish" aria-controls="panel" data-tab="publish" aria-selected="false" tabindex="-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M17.478 9.011h.022c2.485 0 4.5 2.018 4.5 4.508c0 2.32-1.75 4.232-4 4.481m-.522-8.989q.021-.248.022-.5A5.505 5.505 0 0 0 12 3a5.505 5.505 0 0 0-5.48 5.032m10.958.98a5.5 5.5 0 0 1-1.235 3.005M6.52 8.032A5.006 5.006 0 0 0 2 13.018a5.01 5.01 0 0 0 4 4.91m.52-9.896q.237-.023.48-.023c1.126 0 2.165.373 3 1.002M12 13v8m0-8c-.7 0-2.008 1.994-2.5 2.5M12 13c.7 0 2.008 1.994 2.5 2.5"/></svg>Publish</button>
+        <button class="tab" role="tab" id="tab-danger" aria-controls="panel" data-tab="danger" aria-selected="false" tabindex="-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M13.925 21h-3.85c-4.63 0-6.945 0-7.799-1.506c-.853-1.506.331-3.503 2.7-7.495L6.9 8.753C9.176 4.918 10.313 3 12 3s2.824 1.918 5.1 5.753L19.023 12c2.369 3.992 3.553 5.989 2.7 7.495C20.87 21 18.555 21 13.924 21M12 9v4"/><path d="M12.125 16.75H12m.25 0a.25.25 0 1 1-.5 0a.25.25 0 0 1 .5 0"/></svg>Danger zone</button>
+      </div>
+      <div id="panel" role="tabpanel" tabindex="0"></div>
+    </section>
+
+    <section id="view-trash" aria-labelledby="h-trash" hidden>
+      <div class="page-head">
+        <h1 id="h-trash" tabindex="-1">Trash</h1>
+      </div>
+      <p class="muted">Deleted sites stay here until you purge them. Restoring brings a site back stopped.</p>
+      <div id="trash-empty" class="empty" hidden>
+        <p class="empty-title">Trash is empty</p>
+        <p class="empty-hint">Sites you move to trash appear here, ready to restore or delete permanently.</p>
+      </div>
+      <ul class="list" id="trash-list" aria-label="Trashed sites" hidden></ul>
+    </section>
+
+    <section id="view-cloudflare" aria-labelledby="h-cloudflare" hidden>
+      <div class="page-head">
+        <h1 id="h-cloudflare" tabindex="-1">Integrations</h1>
+      </div>
+      <p class="muted">Connect the services your sites publish to. Per-site publish settings stay on each site's Publish tab.</p>
+      <div id="cloudflare-body"></div>
+    </section>
+
+    <section id="view-engine" aria-labelledby="h-engine" hidden>
+      <div class="page-head">
+        <h1 id="h-engine" tabindex="-1">Engine</h1>
+      </div>
+      <div class="panel">
+        <dl class="facts">
+          <div class="fact"><dt>Status</dt><dd><span class="status running">Running</span></dd></div>
+          <div class="fact"><dt>Dashboard</dt><dd class="address" id="engine-dashboard"></dd></div>
+          <div class="fact"><dt>Site gateway</dt><dd class="address" id="engine-gateway"></dd></div>
+        </dl>
+      </div>
+    </section>
+  </main>
+
+  <footer class="statusbar" aria-label="Engine status">
+    <span class="status running">Engine running</span>
+    <span class="bar-item">Gateway <span class="address" id="bar-gateway"></span></span>
+    <span class="bar-grow"></span>
+    <span class="bar-item" id="bar-cloudflare"></span>
+  </footer>
+  </div>
+</div>
+
+<dialog id="dlg-create" aria-labelledby="dlg-create-title">
+  <form id="create-form" method="dialog" novalidate>
+    <h2 id="dlg-create-title">New site</h2>
+    <div id="create-form-fields">
+      <div class="field">
+        <label for="create-name">
+          Site name
+          <span class="hint" id="create-name-hint">Lowercase letters, digits, and dashes. Example: client-blog</span>
+        </label>
+        <input type="text" id="create-name" name="name" autocomplete="off" required pattern="[a-z0-9-]+" aria-describedby="create-name-hint create-name-error" aria-invalid="false">
+        <span class="field-error" id="create-name-error" hidden></span>
+      </div>
+      <div class="field">
+        <label for="create-port">
+          Port <span class="hint">(optional, picked automatically if empty)</span>
+        </label>
+        <input type="number" id="create-port" name="port" min="1024" max="65535" inputmode="numeric" aria-describedby="create-port-error" aria-invalid="false">
+        <span class="field-error" id="create-port-error" hidden></span>
+      </div>
+    </div>
+    <div id="create-result" hidden>
+      <p class="notice-line" id="create-password-note">Site created. Save the admin password now; it is shown once.</p>
+      <p>Admin password: <code class="secret" id="create-password"></code></p>
+    </div>
+    <div class="dialog-actions">
+      <button class="btn white" type="button" id="create-cancel"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6L6 18m12 0L6 6"/></svg>Cancel</button>
+      <button class="btn solid" type="submit" id="create-submit"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 4v16m8-8H4"/></svg>Create site</button>
+      <button class="btn solid" type="button" id="create-done" hidden><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 14l3.5 3.5L19 6.5"/></svg>Done</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-confirm" aria-labelledby="dlg-confirm-title" aria-describedby="dlg-confirm-body">
+  <form method="dialog" class="dialog-body">
+    <h2 id="dlg-confirm-title"></h2>
+    <p id="dlg-confirm-body" class="muted"></p>
+    <div class="dialog-actions">
+      <button class="btn white" value="cancel" type="submit"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6L6 18m12 0L6 6"/></svg>Cancel</button>
+      <button class="btn solid" value="ok" type="submit" id="dlg-confirm-ok"></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-purge" aria-labelledby="dlg-purge-title" aria-describedby="dlg-purge-body">
+  <form id="purge-form" method="dialog" class="dialog-body" novalidate>
+    <h2 id="dlg-purge-title">Delete permanently</h2>
+    <p id="dlg-purge-body" class="muted"></p>
+    <label for="purge-confirm">
+      <span id="purge-label"></span>
+    </label>
+    <input type="text" id="purge-confirm" autocomplete="off" aria-describedby="purge-error" aria-invalid="false">
+    <span class="field-error" id="purge-error" hidden></span>
+    <div class="dialog-actions">
+      <button class="btn white" value="cancel" type="submit"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6L6 18m12 0L6 6"/></svg>Cancel</button>
+      <button class="btn solid danger" value="ok" type="submit" id="purge-ok"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m19.5 5.5l-.62 10.025c-.158 2.561-.237 3.842-.88 4.763a4 4 0 0 1-1.2 1.128c-.957.584-2.24.584-4.806.584c-2.57 0-3.855 0-4.814-.585a4 4 0 0 1-1.2-1.13c-.642-.922-.72-2.205-.874-4.77L4.5 5.5M3 5.5h18m-4.944 0l-.683-1.408c-.453-.936-.68-1.403-1.071-1.695a2 2 0 0 0-.275-.172C13.594 2 13.074 2 12.035 2c-1.066 0-1.599 0-2.04.234a2 2 0 0 0-.278.18c-.395.303-.616.788-1.058 1.757L8.053 5.5m1.447 11v-6m5 6v-6"/></svg>Delete permanently</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-publish" aria-labelledby="dlg-publish-title" aria-describedby="dlg-publish-body">
+  <form method="dialog" class="dialog-body">
+    <h2 id="dlg-publish-title">Publish</h2>
+    <div id="dlg-publish-body"></div>
+    <div class="dialog-actions">
+      <button class="btn white" value="cancel" type="submit"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6L6 18m12 0L6 6"/></svg>Cancel</button>
+      <button class="btn solid" value="ok" type="submit" id="dlg-publish-ok"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6.219 11.618l-2.907-.38c-.596-.077-.993-.654-.729-1.192C3.425 8.334 5.62 6.354 9.74 6.68m-3.521 4.937c1.055-1.764 2.353-3.614 3.52-4.937m-3.52 4.937l5.663 5.663M9.74 6.681c3.67-4.091 7.434-4.953 9.854-4.614a2.156 2.156 0 0 1 1.84 1.84c.338 2.419-.524 6.182-4.615 9.853m-4.937 3.521l.38 2.907c.077.596.654.993 1.192.729c1.712-.842 3.692-3.036 3.365-7.157m-4.937 3.521c1.764-1.055 3.614-2.353 4.937-3.52"/><path d="M17.5 8a2 2 0 1 0-4 0a2 2 0 0 0 4 0M4 22l4-4m-4-1l1.5-1.5"/></svg>Publish</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-login" aria-labelledby="dlg-login-title" aria-describedby="dlg-login-body">
+  <div class="dialog-body">
+    <h2 id="dlg-login-title">Sign in with Cloudflare</h2>
+    <p id="dlg-login-body" class="muted">A Cloudflare page opens in your browser. Choose an account and approve access; this window updates by itself.</p>
+    <p id="login-status" role="status">Starting Cloudflare sign-in…</p>
+    <p><a id="login-link" href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener" hidden>Open the Cloudflare sign-in page<span class="sr-only"> (opens in a new tab)</span></a></p>
+    <p class="hint">Kandang uses the same OAuth session as Wrangler, stored in <span class="address">~/.config/.wrangler</span>. For a Pages-only credential, use an API token instead.</p>
+    <div class="dialog-actions">
+      <button class="btn white" type="button" id="login-cancel"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6L6 18m12 0L6 6"/></svg>Cancel</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlg-cloudflare" aria-labelledby="dlg-cf-title" aria-describedby="dlg-cf-help">
+  <form id="cf-form" class="dialog-body" novalidate>
+    <h2 id="dlg-cf-title">Connect Cloudflare</h2>
+    <p id="dlg-cf-help" class="muted">Create an API token with the permission <strong>Account → Cloudflare Pages → Edit</strong>, then paste it here. <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener">Create a token in Cloudflare</a><span class="sr-only"> (opens in a new tab)</span>.</p>
+    <label for="cf-token">API token</label>
+    <input type="password" id="cf-token" autocomplete="off" spellcheck="false" aria-describedby="cf-token-hint cf-token-error" aria-invalid="false">
+    <p class="hint" id="cf-token-hint">Stored in your desktop keyring. It is never written to a file, logged, or sent back to this page.</p>
+    <span class="field-error" id="cf-token-error" hidden></span>
+    <div class="dialog-actions">
+      <button class="btn white" type="button" id="cf-cancel"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6L6 18m12 0L6 6"/></svg>Cancel</button>
+      <button class="btn solid" type="submit" id="cf-save"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.879 3H11C7.229 3 5.343 3 4.172 4.172S3 7.229 3 11v2c0 3.771 0 5.657 1.172 6.828S7.229 21 11 21h2c3.771 0 5.657 0 6.828-1.172S21 16.771 21 13V8.121c0-.456 0-.685-.024-.904a4 4 0 0 0-.854-2.06c-.138-.173-.3-.334-.622-.657c-.323-.323-.484-.484-.656-.622a4 4 0 0 0-2.061-.854C16.563 3 16.335 3 15.879 3"/><path d="M17 3.5V4c0 1.886 0 2.828-.586 3.414S14.886 8 13 8h-2c-1.886 0-2.828 0-3.414-.586S7 5.886 7 4v-.5m10 17V17c0-1.886 0-2.828-.586-3.414S14.886 13 13 13h-2c-1.886 0-2.828 0-3.414.586S7 15.114 7 17v3.5"/></svg>Save token</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/dashboard.js" defer></script>
+</body>
+</html>

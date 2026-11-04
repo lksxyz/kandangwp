@@ -1,0 +1,524 @@
+use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::Read;
+use std::path::PathBuf;
+use std::process::Child;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::thread::JoinHandle;
+
+use anyhow::{Context, Result, bail};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+
+use crate::config::{self, PORT};
+use crate::http::{Request, Response};
+use crate::{credentials, provision, publish, sites};
+
+const PAGE: &str = include_str!("dashboard.html");
+const STYLE: &str = include_str!("dashboard.css");
+const SCRIPT: &str = include_str!("dashboard.js");
+const MARK: &str = include_str!("../../assets/brand/kandang-mark.svg");
+const FONT_REGULAR: &[u8] = include_bytes!("../../assets/font/OpenRunde-Regular.woff2");
+const FONT_SEMIBOLD: &[u8] = include_bytes!("../../assets/font/OpenRunde-Semibold.woff2");
+const FONT_BOLD: &[u8] = include_bytes!("../../assets/font/OpenRunde-Bold.woff2");
+const LOG_LINES: usize = 200;
+
+pub struct State {
+    token: Arc<String>,
+    servers: Arc<Mutex<HashMap<String, Child>>>,
+    login: Arc<Mutex<Option<credentials::Login>>>,
+    publish: Arc<Mutex<HashMap<String, PublishJob>>>,
+}
+
+impl State {
+    /// A cheap handle sharing the same locks; used to move a clone of the
+    /// state into the publish thread.
+    fn mirror(state: &State) -> State {
+        State {
+            token: Arc::clone(&state.token),
+            servers: Arc::clone(&state.servers),
+            login: Arc::clone(&state.login),
+            publish: Arc::clone(&state.publish),
+        }
+    }
+}
+
+/// One in-flight publish per site. Phases mirror what the publish thread
+/// does, so the UI can show where the work currently is.
+#[derive(Clone, Serialize)]
+struct PublishJob {
+    phase: &'static str,
+    error: Option<String>,
+}
+
+impl PublishJob {
+    fn running(phase: &'static str) -> Self {
+        Self { phase, error: None }
+    }
+}
+
+impl State {
+    pub fn new() -> Result<Self> {
+        reap_stale_servers();
+        let mut bytes = [0u8; 32];
+        File::open("/dev/urandom")?.read_exact(&mut bytes)?;
+        let token = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        Ok(Self {
+            token: Arc::new(token),
+            servers: Arc::new(Mutex::new(HashMap::new())),
+            login: Arc::new(Mutex::new(None)),
+            publish: Arc::new(Mutex::new(HashMap::new())),
+        })
+    }
+
+    pub fn stop_all(&self) {
+        if let Some(mut login) = self.login.lock().unwrap().take() {
+            login.cancel();
+        }
+        let mut servers = self.servers.lock().unwrap_or_else(|e| e.into_inner());
+        for (_, mut child) in servers.drain() {
+            publish::stop(&mut child);
+        }
+        save_pids(&servers);
+    }
+}
+
+fn pid_file() -> Result<PathBuf> {
+    Ok(config::runtime_dir()?.join("servers.json"))
+}
+
+fn save_pids(servers: &HashMap<String, Child>) {
+    let pids: HashMap<&String, u32> = servers.iter().map(|(name, c)| (name, c.id())).collect();
+    if let (Ok(path), Ok(text)) = (pid_file(), serde_json::to_string(&pids)) {
+        let _ = fs::write(path, text);
+    }
+}
+
+fn reap_stale_servers() {
+    let Ok(path) = pid_file() else { return };
+    let Ok(text) = fs::read_to_string(&path) else {
+        return;
+    };
+    let pids: HashMap<String, u32> = serde_json::from_str(&text).unwrap_or_default();
+    for (name, pid) in pids {
+        let Ok(root) = provision::site_dir(&name) else {
+            continue;
+        };
+        let cmdline = fs::read(format!("/proc/{pid}/cmdline")).unwrap_or_default();
+        let needle = root.to_string_lossy().into_owned();
+        if String::from_utf8_lossy(&cmdline).contains(&needle) {
+            unsafe {
+                libc::kill(pid as i32, libc::SIGTERM);
+            }
+        }
+    }
+    let _ = fs::remove_file(path);
+}
+
+pub fn handle(state: &State, request: &Request) -> Response {
+    if !allowed_host(request) {
+        return Response::text(403, "forbidden host".into());
+    }
+
+    let segments: Vec<&str> = request.path.trim_matches('/').split('/').collect();
+    let result = match (request.method.as_str(), segments.as_slice()) {
+        ("GET", [""]) => return Response::html(PAGE.replace("__TOKEN__", &state.token)),
+        ("GET", ["dashboard.css"]) => return Response::css(STYLE),
+        ("GET", ["dashboard.js"]) => return Response::js(SCRIPT),
+        ("GET", ["favicon.svg"]) => return Response::svg(MARK.replace("#ff5e1f", "#1a1a18")),
+        ("GET", ["fonts", "OpenRunde-Regular.woff2"]) => return Response::font(FONT_REGULAR),
+        ("GET", ["fonts", "OpenRunde-Semibold.woff2"]) => return Response::font(FONT_SEMIBOLD),
+        ("GET", ["fonts", "OpenRunde-Bold.woff2"]) => return Response::font(FONT_BOLD),
+        ("GET", ["api", "sites"]) => sites::list().map(|s| json!(s)),
+        ("GET", ["api", "trash"]) => sites::list_trash().map(|t| json!(t)),
+        ("GET", ["api", "cloudflare"]) => Ok(cloudflare_status(state)),
+        ("GET", ["api", "cloudflare", "projects"]) => {
+            publish::list_projects().map(|p| json!({ "projects": p }))
+        }
+        ("GET", ["api", "status"]) => Ok(json!({
+            "dashboard_port": PORT,
+            "gateway_port": config::GATEWAY_PORT,
+        })),
+        ("GET", ["api", "sites", name]) => site_detail(name),
+        ("GET", ["api", "sites", name, "publish", "status"]) => {
+            let jobs = state.publish.lock().unwrap_or_else(|e| e.into_inner());
+            match jobs.get(*name) {
+                Some(job) => Ok(json!(job)),
+                None => Ok(json!({ "phase": "idle" })),
+            }
+        }
+        ("GET", ["api", "sites", name, "logs"]) => {
+            return match read_logs(name) {
+                Ok(text) => Response::text(200, text),
+                Err(e) => Response::text(400, format!("{e:#}")),
+            };
+        }
+        ("POST", _) => {
+            if request.header("x-kandang-token") != Some(state.token.as_str()) {
+                return Response::text(403, "missing or wrong token".into());
+            }
+            if request.header("content-type") != Some("application/json") {
+                return Response::text(400, "expected application/json".into());
+            }
+            match parse_body(request) {
+                Ok(body) => post(state, &segments, &body),
+                Err(e) => Err(e),
+            }
+        }
+        _ => return Response::text(404, "not found".into()),
+    };
+
+    match result {
+        Ok(value) => Response::json(200, &value),
+        Err(e) => Response::json(400, &json!({ "error": format!("{e:#}") })),
+    }
+}
+
+fn allowed_host(request: &Request) -> bool {
+    let allowed = [format!("localhost:{PORT}"), format!("127.0.0.1:{PORT}")];
+    request
+        .header("host")
+        .is_some_and(|host| allowed.iter().any(|a| a == host))
+}
+
+fn parse_body(request: &Request) -> Result<Value> {
+    if request.body.is_empty() {
+        return Ok(json!({}));
+    }
+    Ok(serde_json::from_slice(&request.body)?)
+}
+
+fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
+    match segments {
+        ["api", "sites"] => {
+            #[derive(Deserialize)]
+            struct Create {
+                name: String,
+                port: Option<u16>,
+            }
+            let create: Create = serde_json::from_value(body.clone())?;
+            let port = match create.port {
+                Some(port) => port,
+                None => sites::next_port()?,
+            };
+            let info = provision::create(&create.name, port)?;
+            Ok(json!({
+                "name": info.name,
+                "url": info.url,
+                "admin_user": info.admin_user,
+                "admin_password": info.admin_password,
+                "password_stored": info.password_stored,
+            }))
+        }
+        ["api", "sites", name, "admin-password"] => {
+            provision::port_of(name)?;
+            let password = credentials::load_site_password(name)?
+                .context("the admin password is not in the desktop keyring; reset it instead")?;
+            Ok(json!({ "user": "admin", "password": password }))
+        }
+        ["api", "sites", name, "admin-password", "reset"] => {
+            provision::port_of(name)?;
+            let password = provision::random_password()?;
+            provision::reset_admin_password(name, &password)?;
+            let stored = credentials::store_site_password(name, &password).is_ok();
+            Ok(json!({ "user": "admin", "password": password, "stored": stored }))
+        }
+        ["api", "sites", name, "start"] => {
+            start(state, name)?;
+            Ok(json!({ "running": true }))
+        }
+        ["api", "sites", name, "stop"] => {
+            stop(state, name)?;
+            Ok(json!({ "running": false }))
+        }
+        ["api", "cloudflare"] => {
+            let token = string_field(body, "token")?;
+            credentials::store(&token)?;
+            Ok(json!({ "connected": true, "method": "token" }))
+        }
+        ["api", "cloudflare", "login"] => {
+            let mut login = state.login.lock().unwrap();
+            if credentials::session_connected() {
+                bail!("already signed in to Cloudflare");
+            }
+            if let Some(mut previous) = login.take() {
+                previous.cancel();
+            }
+            *login = Some(credentials::start_login()?);
+            Ok(json!({ "started": true }))
+        }
+        ["api", "cloudflare", "login", "cancel"] => {
+            if let Some(mut login) = state.login.lock().unwrap().take() {
+                login.cancel();
+            }
+            Ok(json!({ "cancelled": true }))
+        }
+        ["api", "cloudflare", "disconnect"] => {
+            if let Some(mut login) = state.login.lock().unwrap().take() {
+                login.cancel();
+            }
+            credentials::clear()?;
+            credentials::logout_session()?;
+            Ok(json!({ "connected": false }))
+        }
+        ["api", "sites", name, "settings"] => {
+            let project = string_field(body, "project")?.trim().to_string();
+            if project.is_empty() {
+                bail!("enter a Cloudflare Pages project name");
+            }
+            if !project
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            {
+                bail!("the project name uses lowercase letters, digits, and dashes only");
+            }
+            let settings = publish::Settings {
+                public: publish::default_public(&project),
+                project,
+            };
+            publish::write_settings(name, &settings)?;
+            Ok(json!({ "saved": true }))
+        }
+        ["api", "sites", name, "publish"] => {
+            provision::port_of(name)?;
+            if !credentials::connected() {
+                bail!("connect Cloudflare first");
+            }
+            let saved = publish::read_settings(name)?;
+            let project = body
+                .get("project")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+                .unwrap_or(saved.project);
+            let project = project.trim().to_string();
+            if project.is_empty() {
+                bail!("enter a Cloudflare Pages project name first");
+            }
+            let mut public = body
+                .get("public")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+                .unwrap_or(saved.public.clone());
+            public = public.trim().to_string();
+            let guessed = format!("https://{project}.pages.dev");
+            if public.is_empty() || public == guessed {
+                // Resolve the domain Cloudflare actually assigned; a saved
+                // guess from before the project existed would 404 forever.
+                public = publish::default_public(&project);
+            }
+            if public != saved.public {
+                publish::write_settings(
+                    name,
+                    &publish::Settings {
+                        public: public.clone(),
+                        project: project.clone(),
+                    },
+                )?;
+            }
+            let dry_run = body
+                .get("dry_run")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+
+            let started_here = start(state, name)?;
+            let exported = publish::export_site(name, &public);
+            if started_here {
+                stop(state, name)?;
+            }
+            exported?;
+
+            if dry_run {
+                let plan = publish::plan(name, &public, &project)?;
+                return Ok(json!({
+                    "dry_run": true,
+                    "files": plan.files,
+                    "changed": plan.changed,
+                    "published": public,
+                    "project": project,
+                }));
+            }
+            // A failed job stays visible via the status endpoint but must not
+            // block the next attempt.
+            {
+                let mut jobs = state.publish.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(job) = jobs.get(*name) {
+                    if job.phase == "error" {
+                        jobs.remove(*name);
+                    }
+                }
+            }
+            if publish_running(state, name) {
+                bail!("publish is already running for {name}");
+            }
+            let state = State::mirror(state);
+            let publish_jobs = Arc::clone(&state.publish);
+            let job_name = name.to_string();
+            let track_name = job_name.clone();
+            let job_project = project.clone();
+            let job_public = public.clone();
+            let join = thread::spawn(move || {
+                let set_phase = |p: &'static str| {
+                    let mut jobs = publish_jobs.lock().unwrap_or_else(|e| e.into_inner());
+                    jobs.insert(job_name.clone(), PublishJob::running(p));
+                };
+                let outcome = (|| {
+                    set_phase("starting");
+                    let started_here = start(&state, &job_name)?;
+                    set_phase("exporting");
+                    let exported = publish::export_site(&job_name, &job_public);
+                    if started_here {
+                        let _ = stop(&state, &job_name);
+                    }
+                    exported?;
+                    set_phase("deploying");
+                    let log = publish::log_path(&job_name)?;
+                    publish::deploy_logged(&job_name, &job_project, log)
+                })();
+                let mut jobs = publish_jobs.lock().unwrap_or_else(|e| e.into_inner());
+                match outcome {
+                    Ok(()) => {
+                        jobs.remove(&job_name);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        jobs.insert(
+                            job_name.clone(),
+                            PublishJob {
+                                phase: "error",
+                                error: Some(format!("{e:#}")),
+                            },
+                        );
+                        Err(e)
+                    }
+                }
+            });
+            track_join(&track_name, join);
+            Ok(json!({
+                "started": true,
+                "project": project,
+                "published": public,
+            }))
+        }
+        ["api", "sites", name, "trash"] => {
+            stop(state, name)?;
+            sites::trash(name)?;
+            Ok(json!({ "trashed": name }))
+        }
+        ["api", "trash", id, "restore"] => {
+            let name = sites::restore(id)?;
+            Ok(json!({ "restored": name }))
+        }
+        ["api", "trash", id, "purge"] => {
+            sites::purge(id, &string_field(body, "confirm")?)?;
+            Ok(json!({ "purged": id }))
+        }
+        _ => bail!("unknown action"),
+    }
+}
+
+fn cloudflare_status(state: &State) -> Value {
+    let mut login = state.login.lock().unwrap();
+    let (logging_in, login_url) = match login.as_mut() {
+        Some(active) => {
+            let status = active.update();
+            (status.running, status.url)
+        }
+        None => (false, None),
+    };
+    if !logging_in && credentials::session_connected() {
+        *login = None;
+    }
+    let method = credentials::method();
+    json!({
+        "connected": method.is_some(),
+        "method": method,
+        "logging_in": logging_in,
+        "login_url": login_url,
+    })
+}
+
+fn site_detail(name: &str) -> Result<Value> {
+    let port = provision::port_of(name)?;
+    let settings = publish::read_settings(name)?;
+    let exported = provision::site_dir(name)?
+        .join("public/index.html")
+        .is_file();
+    Ok(json!({
+        "name": name,
+        "port": port,
+        "url": config::gateway_url(name).trim_end_matches('/'),
+        "preview_url": exported.then(|| format!("http://{name}.preview.localhost:{}/", config::GATEWAY_PORT)),
+        "running": sites::is_listening(port),
+        "exported": exported,
+        "cloudflare_connected": credentials::connected(),
+        "cloudflare_method": credentials::method(),
+        "settings": settings,
+        "suggested_project": publish::suggest_project(name),
+        "deployed": publish::deployed_target(name),
+    }))
+}
+
+fn string_field(body: &Value, key: &str) -> Result<String> {
+    body.get(key)
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .with_context(|| format!("missing field {key}"))
+}
+
+pub fn start_site(state: &State, name: &str) -> Result<bool> {
+    start(state, name)
+}
+
+pub fn stop_site(state: &State, name: &str) -> Result<()> {
+    stop(state, name)
+}
+
+fn start(state: &State, name: &str) -> Result<bool> {
+    let port = provision::port_of(name)?;
+    let mut servers = state.servers.lock().unwrap_or_else(|e| e.into_inner());
+    if sites::is_listening(port) {
+        return Ok(false);
+    }
+    let child = publish::serve(name, false)?;
+    servers.insert(name.to_string(), child);
+    save_pids(&servers);
+    Ok(true)
+}
+
+fn stop(state: &State, name: &str) -> Result<()> {
+    let port = provision::port_of(name)?;
+    let mut servers = state.servers.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(mut child) = servers.remove(name) {
+        publish::stop(&mut child);
+    }
+    save_pids(&servers);
+    if sites::is_listening(port) {
+        bail!("{name} is running outside Kandang and cannot be stopped here");
+    }
+    Ok(())
+}
+
+fn publish_running(state: &State, name: &str) -> bool {
+    state
+        .publish
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .contains_key(name)
+}
+
+fn track_join(_name: &str, join: JoinHandle<Result<()>>) {
+    // The thread reports its own result; the handle is only reaped so the
+    // OS does not keep zombie bookkeeping around after long sessions.
+    std::thread::spawn(move || {
+        let _ = join.join();
+    });
+}
+
+fn read_logs(name: &str) -> Result<String> {
+    let path = publish::log_path(name)?;
+    let text = fs::read_to_string(&path).unwrap_or_default();
+    let lines: Vec<&str> = text.lines().collect();
+    let start = lines.len().saturating_sub(LOG_LINES);
+    Ok(lines[start..].join("\n"))
+}

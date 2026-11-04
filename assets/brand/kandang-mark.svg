@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Kandang">
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="#ff5e1f"/>
+  <g fill="#ffffff">
+    <path d="M16 46 V23 L19 17 L22 23 V46 Z"/>
+    <path d="M29 46 V23 L32 17 L35 23 V46 Z"/>
+    <path d="M42 46 V23 L45 17 L48 23 V46 Z"/>
+    <rect x="16" y="26" width="32" height="4" rx="2"/>
+    <rect x="16" y="37" width="32" height="4" rx="2"/>
+  </g>
+</svg>
