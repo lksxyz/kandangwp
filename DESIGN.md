@@ -42,7 +42,7 @@ Contrast: white on #1570ef ≈ 4.7:1 (AA); #1158c4 on #f8faff ≈ 5.9:1.
 The strip above the content carries the run: three named phases while it works, then one of two settled states. Done is a green `Published` badge beside the change count (`4 of 12 files changed`, or `Everything was already up to date`) with **Open live site** and Dismiss; failure swaps in the error text with **View log** and Dismiss. Both settled states are terminal — nothing auto-advances. The strip hides after 20 seconds, and is not shown again on a return more than two minutes later; the durable record lives in the Publish tab's **Last publish** block (deployed and preview addresses) and in the Overview's Publishing ledger.
 
 **Preline-informed components** (ported manually to CSS tokens, no Tailwind):
-- Tabs: underline strip, 14px labels, 16px Hugeicons, active accent text + 2px underline.
+- Tabs: segmented bar on a gray-50 track (1px hairline, 10px radius, 3px inset) with one 34px chip per section; the selected chip is white with a hairline and a deep-blue label, hover is gray-soft. Danger zone is red throughout — red label, red-soft hover, red-soft selected chip with a red hairline.
 - Breadcrumb: `ol` with chevron separators, 14px, current page semibold.
 - Badges (`.status`): rounded-md, 12px/500, 6px dot.
 - Inputs: 1px border, 8px radius, focus border accent + 4px ring.
@@ -69,6 +69,7 @@ Destructive actions keep one of the six variants and add the `.danger` tone: `so
 
 ## History
 
+- 2026-11-05: Tab strip rebuilt from bare underlines into a segmented bar so the four site sections read as tabs at a glance; Danger zone carries red text, red hover, and a red-soft selected chip. Phones drop the tab icons to keep all four visible.
 - 2026-11-05: Publish and review start the site when it is stopped and leave it running, so the authoring window never disappears mid-publish; the review dialog says so.
 - 2026-11-05: Publish flow redesigned end to end: the review dialog became a ledger with a state-aware primary action, the progress strip gained settled states with **Open live site** / **View log** and an explicit Dismiss, and the Publish tab gained a **Last publish** block. Dashboard publishes now write the deploy manifest, so the deployed address and the changed-file count are real afterwards.
 - 2026-11-05: Site Overview rebuilt as a two-door ledger: one card split by a hairline into Authoring and Publishing, label/value rows replacing the auto-fit fact tiles. Dropped the Status row there (the page head badge already carries it), gave the missing preview and public address a text action into the Publish tab, and switched `dl.facts` to the same ledger on the Engine page.

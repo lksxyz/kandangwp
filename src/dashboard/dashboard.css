@@ -307,23 +307,33 @@
   .empty p:last-child { margin-bottom: 0; }
 
   .tabs {
-    display: flex; gap: 4px; margin: 0 0 16px;
-    border-bottom: 1px solid var(--line);
+    display: flex; gap: 2px; width: max-content; max-width: 100%;
+    margin: 0 0 16px; padding: 3px;
+    background: var(--gray-50);
+    border: 1px solid var(--line); border-radius: 10px;
     overflow-x: auto; scrollbar-width: none;
   }
   .tab {
     display: inline-flex; align-items: center; gap: 8px;
     font: inherit; font-size: 0.875rem; font-weight: 500; line-height: 1;
-    background: none; border: 0; cursor: pointer;
-    padding: 16px 4px; color: var(--muted-foreground-1); white-space: nowrap;
-    border-bottom: 2px solid transparent; margin-bottom: -1px;
-    transition: color var(--dur) var(--ease);
+    background: none; border: 1px solid transparent; border-radius: 7px;
+    min-height: 34px; padding: 0 14px;
+    color: var(--muted); cursor: pointer; white-space: nowrap;
+    transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
   }
-  .tab:hover { color: var(--primary-hover); }
-  .tab[aria-selected="true"] { color: var(--primary-active); font-weight: 600; border-bottom-color: var(--primary-active); }
+  .tab:hover { color: var(--ink); background: var(--gray-soft); }
+  .tab[aria-selected="true"] {
+    background: var(--surface); border-color: var(--line);
+    color: var(--primary-800); font-weight: 600;
+  }
   .tab:focus-visible { outline: none; box-shadow: var(--focus-ring); }
   .tab:disabled { opacity: 0.5; pointer-events: none; }
   .tab > svg { width: 16px; height: 16px; flex: none; }
+  .tab[data-tab="danger"] { color: var(--red); }
+  .tab[data-tab="danger"]:hover { color: var(--red-deep); background: var(--red-soft); }
+  .tab[data-tab="danger"][aria-selected="true"] {
+    background: var(--red-soft); border-color: #f4c9c4; color: var(--red-deep);
+  }
 
   dl.facts { display: grid; margin: 0; }
   dl.facts .fact {
@@ -530,6 +540,8 @@
     .row-main { grid-area: main; }
     .row-actions { grid-area: actions; }
     .empty { padding: 28px 18px; }
+    .tab { padding: 0 11px; }
+    .tab > svg { display: none; }
     dl.facts .fact { grid-template-columns: 104px minmax(0, 1fr); gap: 2px 12px; }
     .dialog-actions { flex-wrap: wrap; }
   }
