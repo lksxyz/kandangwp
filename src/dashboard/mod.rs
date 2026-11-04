@@ -6,6 +6,7 @@ use std::process::Child;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
@@ -45,16 +46,70 @@ impl State {
 }
 
 /// One in-flight publish per site. Phases mirror what the publish thread
-/// does, so the UI can show where the work currently is.
+/// does, so the UI can show where the work currently is. A finished job stays
+/// behind so the dashboard can report the outcome and the deployed address.
 #[derive(Clone, Serialize)]
 struct PublishJob {
     phase: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    project: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    public: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    files: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    changed: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    deployed: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    finished_at: Option<u64>,
 }
 
 impl PublishJob {
     fn running(phase: &'static str) -> Self {
-        Self { phase, error: None }
+        Self {
+            phase,
+            error: None,
+            project: None,
+            public: None,
+            files: None,
+            changed: None,
+            deployed: None,
+            finished_at: None,
+        }
+    }
+}
+
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Terminal jobs stay readable so the dashboard can report the outcome of the
+/// last publish even after the thread is gone.
+fn done_job(outcome: &publish::Outcome, project: String, public: String) -> PublishJob {
+    PublishJob {
+        phase: "done",
+        project: Some(project),
+        public: Some(public),
+        files: Some(outcome.files),
+        changed: Some(outcome.changed),
+        deployed: Some(outcome.deployed),
+        finished_at: Some(now_secs()),
+        ..PublishJob::running("done")
+    }
+}
+
+fn failed_job(error: String) -> PublishJob {
+    PublishJob {
+        phase: "error",
+        error: Some(error),
+        finished_at: Some(now_secs()),
+        ..PublishJob::running("error")
     }
 }
 
@@ -321,12 +376,38 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
                 .and_then(Value::as_bool)
                 .unwrap_or(false);
 
-            let started_here = start(state, name)?;
-            let exported = publish::export_site(name, &public);
-            if started_here {
-                stop(state, name)?;
+            // A finished job stays readable for the dashboard's result strip;
+            // only a running one blocks the next attempt.
+            if publish_running(state, name) {
+                bail!("publish is already running for {name}");
             }
-            exported?;
+            if !dry_run {
+                // Claim the job before the export runs, so the dashboard's
+                // status poll reports the publish as soon as it is accepted.
+                state
+                    .publish
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(name.to_string(), PublishJob::running("starting"));
+            }
+            let setup = (|| -> Result<()> {
+                let started_here = start(state, name)?;
+                let exported = publish::export_site(name, &public);
+                if started_here {
+                    stop(state, name)?;
+                }
+                exported.map(|_| ())
+            })();
+            if let Err(e) = setup {
+                if !dry_run {
+                    state
+                        .publish
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .insert(name.to_string(), failed_job(format!("{e:#}")));
+                }
+                return Err(e);
+            }
 
             if dry_run {
                 let plan = publish::plan(name, &public, &project)?;
@@ -337,19 +418,6 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
                     "published": public,
                     "project": project,
                 }));
-            }
-            // A failed job stays visible via the status endpoint but must not
-            // block the next attempt.
-            {
-                let mut jobs = state.publish.lock().unwrap_or_else(|e| e.into_inner());
-                if let Some(job) = jobs.get(*name) {
-                    if job.phase == "error" {
-                        jobs.remove(*name);
-                    }
-                }
-            }
-            if publish_running(state, name) {
-                bail!("publish is already running for {name}");
             }
             let state = State::mirror(state);
             let publish_jobs = Arc::clone(&state.publish);
@@ -373,25 +441,17 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
                     exported?;
                     set_phase("deploying");
                     let log = publish::log_path(&job_name)?;
-                    publish::deploy_logged(&job_name, &job_project, log)
+                    publish::deploy_if_changed_logged(&job_name, &job_public, &job_project, log)
                 })();
                 let mut jobs = publish_jobs.lock().unwrap_or_else(|e| e.into_inner());
-                match outcome {
-                    Ok(()) => {
-                        jobs.remove(&job_name);
-                        Ok(())
-                    }
-                    Err(e) => {
-                        jobs.insert(
-                            job_name.clone(),
-                            PublishJob {
-                                phase: "error",
-                                error: Some(format!("{e:#}")),
-                            },
-                        );
-                        Err(e)
-                    }
-                }
+                jobs.insert(
+                    job_name.clone(),
+                    match &outcome {
+                        Ok(outcome) => done_job(outcome, job_project, job_public),
+                        Err(e) => failed_job(format!("{e:#}")),
+                    },
+                );
+                outcome.map(|_| ())
             });
             track_join(&track_name, join);
             Ok(json!({
@@ -504,7 +564,8 @@ fn publish_running(state: &State, name: &str) -> bool {
         .publish
         .lock()
         .unwrap_or_else(|e| e.into_inner())
-        .contains_key(name)
+        .get(name)
+        .is_some_and(|job| job.phase != "done" && job.phase != "error")
 }
 
 fn track_join(_name: &str, join: JoinHandle<Result<()>>) {

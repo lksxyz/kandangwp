@@ -90,11 +90,8 @@ pub fn export_site(name: &str, public_base: &str) -> Result<usize> {
     Ok(report.files)
 }
 
-pub fn deploy(name: &str, project: &str) -> Result<()> {
-    deploy_logged(name, project, log_path(name)?)
-}
-
-/// Like [`deploy`], but wrangler output goes to `log` instead of the server log.
+/// Runs wrangler against the exported files; output goes to `log` instead of
+/// the server log.
 pub fn deploy_logged(name: &str, project: &str, log: PathBuf) -> Result<()> {
     let dir = provision::site_dir(name)?.join("public");
     if !dir.exists() {
@@ -347,6 +344,17 @@ pub fn plan(name: &str, public: &str, project: &str) -> Result<Outcome> {
 }
 
 pub fn deploy_if_changed(name: &str, public: &str, project: &str) -> Result<Outcome> {
+    deploy_if_changed_logged(name, public, project, log_path(name)?)
+}
+
+/// Like [`deploy_if_changed`], but wrangler output goes to `log`, and the
+/// deployed manifest is recorded so a later plan can count real changes.
+pub fn deploy_if_changed_logged(
+    name: &str,
+    public: &str,
+    project: &str,
+    log: PathBuf,
+) -> Result<Outcome> {
     let dir = provision::site_dir(name)?.join("public");
     let current = Manifest {
         target: format!("{public}|{project}"),
@@ -364,7 +372,7 @@ pub fn deploy_if_changed(name: &str, public: &str, project: &str) -> Result<Outc
         return Ok(outcome);
     }
 
-    deploy(name, project)?;
+    deploy_logged(name, project, log)?;
     write_manifest(name, &current)?;
     Ok(Outcome {
         deployed: true,
