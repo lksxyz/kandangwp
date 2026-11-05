@@ -252,7 +252,7 @@
     const children = [
       el('dl', { class: 'facts' },
         el('div', { class: 'fact' }, el('dt', { text: 'Changed files' }), el('dd', { text: plan.changed === 0 ? 'None' : `${plan.changed} of ${plan.files}` })),
-        el('div', { class: 'fact' }, el('dt', { text: 'Project' }), el('dd', { text: plan.project })),
+        el('div', { class: 'fact' }, el('dt', { text: 'Pages project' }), el('dd', { text: plan.project })),
         el('div', { class: 'fact' }, el('dt', { text: 'Destination' }), el('dd', {}, el('span', { class: 'address', text: plan.published }))),
       ),
     ];
@@ -474,7 +474,7 @@
         el('dl', { class: 'facts' },
           fact('Public address', publicAddress ? el('span', { class: 'address', text: publicAddress }) : missing('Not set', 'Set up', 'publish')),
           fact('Deployed address', d.deployed ? addressLink(d.deployed) : missing('Not published yet', null)),
-          fact('Cloudflare project', d.settings.project ? el('span', { text: d.settings.project }) : missing('Not set', null)),
+          fact('Pages project', d.settings.project ? el('span', { text: d.settings.project }) : missing('Not set', null)),
         ),
       ),
     );
@@ -632,7 +632,7 @@
       }
       const existing = state.cfProjects.find((p) => p.name === project);
       projectStatus.textContent = existing
-        ? `Publishing to ${project} — existing project, updates it.`
+        ? `Publishing to ${project} — existing Pages project, updates it.`
         : `Publishing to ${project} — created on first publish.`;
       renderDomains(project, existing || null);
     }
@@ -658,7 +658,7 @@
     }
     refreshStatus();
     const form = el('form', { class: 'stack', id: 'publish-form', novalidate: true },
-      el('label', { for: 'pub-project' }, 'Project name', el('span', { class: 'hint', id: 'pub-project-hint', text: 'Follows the site name. The Cloudflare Pages project is created on the first publish.' })),
+      el('label', { for: 'pub-project' }, 'Pages project', el('span', { class: 'hint', id: 'pub-project-hint', text: 'Follows the site name. The Cloudflare Pages project is created on the first publish.' })),
       projectInput,
       projectStatus,
       el('div', { class: 'btn-row' },
