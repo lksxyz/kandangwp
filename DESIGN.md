@@ -69,6 +69,7 @@ Destructive actions keep one of the six variants and add the `.danger` tone: `so
 
 ## History
 
+- 2026-11-05: The Publish tab's project field is now a disabled value that follows the site name (slug); the "Save settings" button is gone, and the destination is always derived from the project, so changing projects can never leave a stale pages.dev URL behind.
 - 2026-11-05: The new-site dialog asks for a project name with capitals, digits, and spaces, shows the derived site name under the field, and creates the slug (`Project Pemda 01` → `project-pemda-01`).
 - 2026-11-05: The project name field accepts capitals, digits, and spaces; Kandang slugifies it (`Pemda Project 1` → `pemda-project-1`) and shows the generated Cloudflare name under the field.
 - 2026-11-05: Tab strip rebuilt from bare underlines into a segmented bar so the four site sections read as tabs at a glance; Danger zone carries red text, red hover, and a red-soft selected chip. Phones drop the tab icons to keep all four visible.

@@ -250,6 +250,7 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
             #[derive(Deserialize)]
             struct Create {
                 name: String,
+                project: Option<String>,
                 port: Option<u16>,
             }
             let create: Create = serde_json::from_value(body.clone())?;
@@ -257,7 +258,14 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
                 Some(port) => port,
                 None => sites::next_port()?,
             };
-            let info = provision::create(&create.name, port)?;
+            let project = create
+                .project
+                .as_deref()
+                .map(str::trim)
+                .filter(|p| !p.is_empty())
+                .unwrap_or(create.name.as_str())
+                .to_string();
+            let info = provision::create(&create.name, port, &project)?;
             Ok(json!({
                 "name": info.name,
                 "url": info.url,
@@ -317,49 +325,25 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
             credentials::logout_session()?;
             Ok(json!({ "connected": false }))
         }
-        ["api", "sites", name, "settings"] => {
-            let project = string_field(body, "project")?.trim().to_string();
-            if project.is_empty() {
-                bail!("enter a Cloudflare Pages project name");
-            }
-            if !project
-                .chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-            {
-                bail!("the project name uses lowercase letters, digits, and dashes only");
-            }
-            let settings = publish::Settings {
-                public: publish::default_public(&project),
-                project,
-            };
-            publish::write_settings(name, &settings)?;
-            Ok(json!({ "saved": true }))
-        }
         ["api", "sites", name, "publish"] => {
             provision::port_of(name)?;
             if !credentials::connected() {
                 bail!("connect Cloudflare first");
             }
             let saved = publish::read_settings(name)?;
-            let project = body
-                .get("project")
-                .and_then(Value::as_str)
-                .map(str::to_string)
-                .unwrap_or(saved.project);
-            let project = project.trim().to_string();
-            if project.is_empty() {
-                bail!("enter a Cloudflare Pages project name first");
-            }
+            let project = name.to_string();
+            // The destination always follows the project; a saved public from
+            // an earlier project would keep publishing to the wrong domain.
             let mut public = body
                 .get("public")
                 .and_then(Value::as_str)
-                .map(str::to_string)
-                .unwrap_or(saved.public.clone());
-            public = public.trim().to_string();
+                .map(str::trim)
+                .unwrap_or_default()
+                .to_string();
             let guessed = format!("https://{project}.pages.dev");
             if public.is_empty() || public == guessed {
-                // Resolve the domain Cloudflare actually assigned; a saved
-                // guess from before the project existed would 404 forever.
+                // Resolve the domain Cloudflare actually assigned; a guess
+                // from before the project existed would 404 forever.
                 public = publish::default_public(&project);
             }
             if public != saved.public {
@@ -509,7 +493,7 @@ fn site_detail(name: &str) -> Result<Value> {
         "cloudflare_connected": credentials::connected(),
         "cloudflare_method": credentials::method(),
         "settings": settings,
-        "suggested_project": publish::suggest_project(name),
+        "title": provision::project_name(name),
         "deployed": publish::deployed_target(name),
     }))
 }

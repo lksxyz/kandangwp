@@ -45,8 +45,9 @@ again later.
 
 ## Publishing
 
-Open the site's Publish tab. Type a project name (`Pemda Project 1` becomes
-`pemda-project-1`), sign in to Cloudflare once, then choose Review and publish.
+Open the site's Publish tab. The Cloudflare Pages project follows the site name
+(`Project Pemda 01` publishes to `project-pemda-01`), so sign in to Cloudflare
+once, then choose Review and publish.
 
 - The first publish creates the Cloudflare Pages project and uses
   `https://<project>.pages.dev` as the public address. To use your own domain,

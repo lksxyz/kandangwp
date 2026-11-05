@@ -100,31 +100,6 @@ pub fn deploy_logged(name: &str, project: &str, log: PathBuf) -> Result<()> {
     cloudflare_pages(&dir, project, Some(log))
 }
 
-pub fn suggest_project(name: &str) -> String {
-    let mut slug = String::new();
-    let mut last_dash = true;
-    for c in name.chars() {
-        if c.is_ascii_alphanumeric() {
-            slug.push(c.to_ascii_lowercase());
-            last_dash = false;
-        } else if !last_dash {
-            slug.push('-');
-            last_dash = true;
-        }
-    }
-    while slug.ends_with('-') {
-        slug.pop();
-    }
-    slug.truncate(32);
-    while slug.ends_with('-') {
-        slug.pop();
-    }
-    if slug.is_empty() {
-        slug.push_str("site");
-    }
-    slug
-}
-
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Project {
     pub name: String,
@@ -485,16 +460,7 @@ mod tests {
         let after = manifest("t", &[("a", "1"), ("b", "9"), ("d", "4")]);
         assert_eq!(changed_files(&before, &after), 3);
         assert_eq!(changed_files(&before, &before), 0);
-    }
 
-    #[test]
-    fn suggests_slugified_project_names() {
-        assert_eq!(suggest_project("My Cool Blog!"), "my-cool-blog");
-        assert_eq!(suggest_project("  --Adé  "), "ad");
-        assert_eq!(suggest_project("!!!"), "site");
-        assert_eq!(suggest_project("").len(), 4);
-        let long = "a".repeat(50);
-        assert_eq!(suggest_project(&long), "a".repeat(32));
     }
 
     #[test]

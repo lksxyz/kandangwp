@@ -370,9 +370,10 @@
       return;
     }
     state.detail = detail;
-    $('h-site').textContent = detail.name;
-    $('crumb-name').textContent = detail.name;
-    document.title = `${detail.name} · Kandang`;
+    const title = detail.title || detail.name;
+    $('h-site').textContent = title;
+    $('crumb-name').textContent = title;
+    document.title = `${title} · Kandang`;
     renderSiteActions(detail);
     setTab(tab, false);
     renderPanel();
@@ -619,18 +620,11 @@
   }
 
   function publishPanel(d) {
-    const projectInput = el('input', { type: 'text', id: 'pub-project', value: d.settings.project || d.suggested_project || '', placeholder: 'My project', autocomplete: 'off', required: true, pattern: '[A-Za-z0-9 -]+', 'aria-describedby': 'pub-project-hint pub-project-status' });
+    const projectInput = el('input', { type: 'text', id: 'pub-project', value: d.name, disabled: true, autocomplete: 'off', 'aria-describedby': 'pub-project-hint pub-project-status' });
     const projectStatus = el('span', { class: 'hint', id: 'pub-project-status', role: 'status', text: '' });
     const domainsBlock = el('div', { id: 'pub-domains', class: 'domain-list' });
-    let debounce = null;
     function refreshStatus() {
-      const error = projectSlugError(projectInput.value);
-      if (error) {
-        projectStatus.textContent = projectInput.value.trim() ? error : '';
-        renderDomains('', null);
-        return;
-      }
-      const project = projectSlug(projectInput.value);
+      const project = d.name;
       if (state.cfProjects === null) {
         projectStatus.textContent = `Publishing to ${project}`;
         renderDomains(project, null);
@@ -659,26 +653,18 @@
           : null,
       );
     }
-    projectInput.addEventListener('input', () => {
-      if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(() => { refreshStatus(); }, 600);
-      renderDomains(projectSlug(projectInput.value), null);
-    });
-    projectInput.addEventListener('blur', refreshStatus);
     if (d.cloudflare_connected) {
       loadProjects().then(refreshStatus).catch(() => {});
     }
     refreshStatus();
     const form = el('form', { class: 'stack', id: 'publish-form', novalidate: true },
-      el('label', { for: 'pub-project' }, 'Project name', el('span', { class: 'hint', id: 'pub-project-hint', text: 'Letters, digits, and spaces. Kandang turns it into a Cloudflare Pages name like my-project and creates it on the first publish.' })),
+      el('label', { for: 'pub-project' }, 'Project name', el('span', { class: 'hint', id: 'pub-project-hint', text: 'Follows the site name. The Cloudflare Pages project is created on the first publish.' })),
       projectInput,
       projectStatus,
       el('div', { class: 'btn-row' },
-        el('button', { class: 'btn white', type: 'submit', id: 'pub-save' }, icon('save'), 'Save settings'),
         el('button', { class: 'btn solid', type: 'button', id: 'pub-check' }, icon('rocket'), 'Review and publish…'),
       ),
     );
-    form.addEventListener('submit', (event) => { event.preventDefault(); saveSettings(d.name); });
     form.querySelector('#pub-check').addEventListener('click', () => reviewPublish(d.name));
     const connected = d.cloudflare_connected;
     form.querySelector('#pub-check').disabled = !connected;
@@ -761,18 +747,8 @@
     return state.cfProjects;
   }
 
-  async function saveSettings(name) {
-    const error = projectSlugError($('pub-project').value);
-    if (error) { showError(error); return; }
-    const body = { project: projectSlug($('pub-project').value) };
-    await run($('pub-save'), () => api('POST', `/api/sites/${encodeURIComponent(name)}/settings`, body), 'Publish settings saved.');
-    await openSite(name, 'publish');
-  }
-
   async function reviewPublish(name) {
-    const error = projectSlugError($('pub-project').value);
-    if (error) { showError(error); return; }
-    const body = { project: projectSlug($('pub-project').value), dry_run: true };
+    const body = { dry_run: true };
     const plan = await run($('pub-check'), () => api('POST', `/api/sites/${encodeURIComponent(name)}/publish`, body));
     if (!plan) return;
     const dialog = $('dlg-publish');
@@ -1028,7 +1004,7 @@
     }
     nameError.hidden = true;
     $('create-name').setAttribute('aria-invalid', 'false');
-    const body = { name };
+    const body = { name, project: rawName.trim() };
     if (portValue) body.port = Number(portValue);
     announce(`Creating ${name}. The first run downloads WordPress and PHP and can take a minute.`);
     const submit = $('create-submit');

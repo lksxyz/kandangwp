@@ -15,6 +15,7 @@ const PORT_RANGE: std::ops::Range<u16> = 8100..9000;
 #[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct SiteSummary {
     pub name: String,
+    pub title: String,
     pub port: u16,
     pub url: String,
     pub running: bool,
@@ -42,6 +43,7 @@ pub fn list() -> Result<Vec<SiteSummary>> {
         };
         sites.push(SiteSummary {
             name: name.clone(),
+            title: provision::project_name(&name),
             port,
             url: config::gateway_url(&name).trim_end_matches('/').to_string(),
             running: is_listening(port),

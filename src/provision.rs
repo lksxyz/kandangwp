@@ -178,7 +178,7 @@ pub struct SiteInfo {
     pub password_stored: bool,
 }
 
-pub fn create(name: &str, port: u16) -> Result<SiteInfo> {
+pub fn create(name: &str, port: u16, project: &str) -> Result<SiteInfo> {
     if !valid_name(name) {
         bail!("site names use lowercase letters, digits, and dashes only");
     }
@@ -189,7 +189,7 @@ pub fn create(name: &str, port: u16) -> Result<SiteInfo> {
     ensure_runtime()?;
 
     fs::create_dir_all(&target)?;
-    match build_site(&target, name, port) {
+    match build_site(&target, name, port, project) {
         Ok(info) => Ok(info),
         Err(e) => {
             let _ = fs::remove_dir_all(&target);
@@ -198,7 +198,7 @@ pub fn create(name: &str, port: u16) -> Result<SiteInfo> {
     }
 }
 
-fn build_site(site: &Path, name: &str, port: u16) -> Result<SiteInfo> {
+fn build_site(site: &Path, name: &str, port: u16, project: &str) -> Result<SiteInfo> {
     let runtime = runtime_dir()?;
     let extract = site.join(".extract");
     fs::create_dir_all(&extract)?;
@@ -242,7 +242,7 @@ fn build_site(site: &Path, name: &str, port: u16) -> Result<SiteInfo> {
             "core",
             "install",
             &format!("--url={url}"),
-            &format!("--title={name}"),
+            &format!("--title={project}"),
             &format!("--admin_user={admin_user}"),
             &format!("--admin_password={admin_password}"),
             &format!("--admin_email=admin@{name}.test"),
@@ -255,6 +255,7 @@ fn build_site(site: &Path, name: &str, port: u16) -> Result<SiteInfo> {
     )?;
     wp(site, &["rewrite", "flush"])?;
     fs::write(site.join(".kandang-port"), port.to_string())?;
+    fs::write(site.join(".kandang-project"), project)?;
     let password_stored = crate::credentials::store_site_password(name, &admin_password).is_ok();
 
     Ok(SiteInfo {
@@ -270,6 +271,31 @@ pub fn port_of(name: &str) -> Result<u16> {
     let raw = fs::read_to_string(site_dir(name)?.join(".kandang-port"))
         .with_context(|| format!("no site named {name}"))?;
     raw.trim().parse().context("corrupt site port")
+}
+
+/// The human project name shown in the dashboard. Sites created before the
+/// name was stored only have the slug, so fall back to title-casing it.
+pub fn project_name(name: &str) -> String {
+    site_dir(name)
+        .ok()
+        .and_then(|dir| fs::read_to_string(dir.join(".kandang-project")).ok())
+        .map(|raw| raw.trim().to_string())
+        .filter(|raw| !raw.is_empty())
+        .unwrap_or_else(|| title_from_slug(name))
+}
+
+pub fn title_from_slug(slug: &str) -> String {
+    slug.split('-')
+        .filter(|word| !word.is_empty())
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn copy_dir(from: &Path, to: &Path) -> Result<()> {
@@ -366,4 +392,16 @@ fn last_line(output: &str) -> String {
         .unwrap_or("")
         .trim()
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slug_fallback_titles_each_word() {
+        assert_eq!(title_from_slug("project-pemda-01"), "Project Pemda 01");
+        assert_eq!(title_from_slug("myproject"), "Myproject");
+        assert_eq!(title_from_slug(""), "");
+    }
 }

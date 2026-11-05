@@ -160,7 +160,7 @@ fn main() -> Result<()> {
         }
         Command::Site { action } => match action {
             SiteAction::Create { name, port } => {
-                let info = provision::create(&name, port)?;
+                let info = provision::create(&name, port, &name)?;
                 println!("site {} created", info.name);
                 println!("  url:      {}", info.url);
                 println!("  admin:    {} / {}", info.admin_user, info.admin_password);

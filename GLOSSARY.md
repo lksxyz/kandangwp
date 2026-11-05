@@ -37,9 +37,11 @@ from the Control Applet or by typing the local URL.
 
 ## Site
 
-A local WordPress installation that Kandang manages. A Site has a name, a
-address on the local machine (its **Domain**), and its own files and database.
-Sites are created, started, stopped, opened, and deleted from the Dashboard.
+A Site has a **Project Name**, the readable name entered at creation (e.g.
+`Project Pemda 01`), and a name slug derived from it that names its directory
+and Domain (e.g. `project-pemda-01`). The Dashboard breadcrumb and page titles
+show the Project Name; the slug identifies the Site to the engine. A Site also
+has its own files and database.
 
 A Site is either **Running** (reachable at its Domain) or **Stopped**.
 
