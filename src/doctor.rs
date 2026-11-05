@@ -45,17 +45,13 @@ pub fn run() -> Result<()> {
     );
 
     check(
-        "secret-tool available (for API tokens)",
+        "secret-tool available (for site admin passwords)",
         crate::credentials::available(),
     );
-    let method = crate::credentials::method();
-    check("Cloudflare connected", method.is_some());
-    match method {
-        Some("token") => println!("[info] using a Pages-scoped API token from the keyring"),
-        Some("session") => {
-            println!("[info] signed in with the browser session shared with Wrangler")
-        }
-        _ => println!("[info] sign in from the Dashboard's Publish tab"),
+    let connected = crate::cloudflare::connected();
+    check("Cloudflare signed in", connected);
+    if !connected {
+        println!("[info] without a Cloudflare sign-in, publish writes a zip of the export");
     }
 
     let icons = icons_dir();

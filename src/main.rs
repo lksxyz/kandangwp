@@ -1,4 +1,5 @@
 mod applet;
+mod cloudflare;
 mod config;
 mod control;
 mod credentials;
@@ -8,6 +9,7 @@ mod engine;
 mod export;
 mod gateway;
 mod http;
+mod pages;
 mod provision;
 mod publish;
 mod sites;
@@ -63,16 +65,16 @@ enum Command {
         #[command(subcommand)]
         action: SiteAction,
     },
-    /// Export a site and deploy it to Cloudflare Pages
+    /// Export a site; publishes to Cloudflare Pages when a token is connected, else writes a zip
     Publish {
         /// Site name
         name: String,
-        /// Public address the site is served at, e.g. https://example.com
+        /// Public address the site is served at, e.g. https://example.com (required for Cloudflare)
         #[arg(long)]
-        public: String,
-        /// Cloudflare Pages project name
+        public: Option<String>,
+        /// Cloudflare Pages project name (defaults to the site name)
         #[arg(long)]
-        project: String,
+        project: Option<String>,
     },
     /// Print the version
     Version,
@@ -201,16 +203,36 @@ fn main() -> Result<()> {
             public,
             project,
         } => {
+            let target = publish::active_target();
+            let public = match (target, public) {
+                (publish::Target::Cloudflare, None) => {
+                    anyhow::bail!("--public is required when Cloudflare is connected")
+                }
+                (publish::Target::Cloudflare, Some(public)) => public,
+                (publish::Target::Zip, public) => public.unwrap_or_else(|| {
+                    config::gateway_url(&name).trim_end_matches('/').to_string()
+                }),
+            };
+            let project = project.unwrap_or_else(|| name.clone());
             let mut server = publish::serve(&name, true)?;
             let exported = publish::export_site(&name, &public);
             publish::stop(&mut server);
             let files = exported?;
-            let outcome = publish::deploy_if_changed(&name, &public, &project)?;
+            let outcome = match target {
+                publish::Target::Cloudflare => {
+                    publish::deploy_if_changed(&name, &public, &project)?
+                }
+                publish::Target::Zip => publish::export_zip(&name)?,
+            };
             println!("exported {files} files, {} changed", outcome.changed);
-            if outcome.deployed {
-                println!("published {name} to {public}");
-            } else {
-                println!("no changes since the last publish; nothing deployed");
+            match (outcome.target, outcome.deployed) {
+                (publish::Target::Zip, _) => {
+                    println!("wrote {}", outcome.location.unwrap_or_default())
+                }
+                (publish::Target::Cloudflare, true) => println!("published {name} to {public}"),
+                (publish::Target::Cloudflare, false) => {
+                    println!("no changes since the last publish; nothing deployed")
+                }
             }
             Ok(())
         }

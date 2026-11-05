@@ -4,6 +4,5 @@ dist
 .env
 .dev.vars
 /target
-.wrangler/
 .pi/
 .impeccable/

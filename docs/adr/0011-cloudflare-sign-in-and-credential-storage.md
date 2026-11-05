@@ -1,4 +1,5 @@
 # Cloudflare sign-in is a browser session, with an optional scoped token
+Status: superseded by ADR 0017. Sign-in is OAuth in the browser; the API token path is gone.
 
 Publishing needs a Cloudflare credential. Kandang offers two paths and stores
 neither in a site file, the browser, or a log.

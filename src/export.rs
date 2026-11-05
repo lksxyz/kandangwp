@@ -42,6 +42,11 @@ struct ExportState {
     /// different homepage means no page may be reused this run.
     #[serde(default)]
     home_fingerprint: Option<String>,
+    /// Digest of every sitemap URL and lastmod. A new or removed post changes
+    /// listing pages (blog index, feeds) whose own lastmod does not move, so
+    /// any change here means no page may be reused this run.
+    #[serde(default)]
+    sitemap_fingerprint: Option<String>,
     pages: BTreeMap<String, PageState>,
 }
 
@@ -106,6 +111,8 @@ fn crawl(opts: &Options, staging: &Path, previous: &ExportState) -> Result<(Repo
     let agent = agent();
     let source_origin = opts.source.origin().ascii_serialization();
     let lastmods = discover_lastmods(&agent, opts, &source_origin);
+    let sitemap_unchanged =
+        previous.sitemap_fingerprint.as_deref() == Some(sitemap_fingerprint(&lastmods).as_str());
 
     let mut queue: VecDeque<Url> = VecDeque::new();
     let mut seen_urls: HashSet<String> = HashSet::new();
@@ -117,6 +124,7 @@ fn crawl(opts: &Options, staging: &Path, previous: &ExportState) -> Result<(Repo
         source: opts.source.as_str().to_string(),
         public_base: opts.public_base.clone(),
         pages: BTreeMap::new(),
+        sitemap_fingerprint: Some(sitemap_fingerprint(&lastmods)),
         ..ExportState::default()
     };
 
@@ -206,7 +214,8 @@ fn crawl(opts: &Options, staging: &Path, previous: &ExportState) -> Result<(Repo
 
         if key == home_key && mime.contains("html") {
             let fingerprint = digest(&body);
-            reuse_allowed = previous.home_fingerprint.as_deref() == Some(fingerprint.as_str());
+            reuse_allowed = sitemap_unchanged
+                && previous.home_fingerprint.as_deref() == Some(fingerprint.as_str());
             state.home_fingerprint = Some(fingerprint);
         }
 
@@ -366,6 +375,15 @@ fn should_skip(url: &Url) -> bool {
     SKIP_PREFIXES
         .iter()
         .any(|prefix| url.path().starts_with(prefix))
+}
+
+fn sitemap_fingerprint(lastmods: &HashMap<String, String>) -> String {
+    let sorted: BTreeMap<&String, &String> = lastmods.iter().collect();
+    let text: String = sorted
+        .iter()
+        .map(|(url, lastmod)| format!("{url}\n{lastmod}\n"))
+        .collect();
+    digest(text.as_bytes())
 }
 
 fn digest(bytes: &[u8]) -> String {
@@ -749,6 +767,62 @@ mod tests {
                 .unwrap()
                 .contains("v3")
         );
+        let _ = fs::remove_dir_all(&out);
+        let _ = fs::remove_file(state_path(&out));
+    }
+
+    #[test]
+    fn a_new_post_refreshes_listing_pages_with_unchanged_lastmod() {
+        let (origin, routes) = serve_shared();
+        let set = |listing: &str, with_post: bool| {
+            let mut sitemap =
+                String::from("<urlset><url><loc>/blog/</loc><lastmod>2026-01-01</lastmod></url>");
+            if with_post {
+                sitemap.push_str("<url><loc>/new-post/</loc><lastmod>2026-03-03</lastmod></url>");
+            }
+            sitemap.push_str("</urlset>");
+            *routes.lock().unwrap() = vec![
+                (
+                    "/".into(),
+                    "text/html".into(),
+                    b"<html><a href=\"/blog/\">blog</a></html>".to_vec(),
+                ),
+                (
+                    "/wp-sitemap.xml".into(),
+                    "application/xml".into(),
+                    sitemap.into_bytes(),
+                ),
+                (
+                    "/blog/".into(),
+                    "text/html".into(),
+                    listing.as_bytes().to_vec(),
+                ),
+                (
+                    "/new-post/".into(),
+                    "text/html".into(),
+                    b"<html>new post</html>".to_vec(),
+                ),
+            ];
+        };
+        let out = temp_out("new-post");
+        let run = || {
+            export(&Options {
+                source: Url::parse(&format!("{origin}/")).unwrap(),
+                public_base: "https://example.com".into(),
+                out: out.clone(),
+                connect: None,
+            })
+            .unwrap()
+        };
+
+        set("<html>no posts yet</html>", false);
+        run();
+
+        set("<html><a href=\"/new-post/\">new post</a></html>", true);
+        let second = run();
+        let listing = fs::read_to_string(out.join("blog/index.html")).unwrap();
+        assert!(listing.contains("new-post"), "stale listing: {listing}");
+        assert_eq!(second.reused, 0);
         let _ = fs::remove_dir_all(&out);
         let _ = fs::remove_file(state_path(&out));
     }

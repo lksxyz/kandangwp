@@ -28,7 +28,6 @@ const LOG_LINES: usize = 200;
 pub struct State {
     token: Arc<String>,
     servers: Arc<Mutex<HashMap<String, Child>>>,
-    login: Arc<Mutex<Option<credentials::Login>>>,
     publish: Arc<Mutex<HashMap<String, PublishJob>>>,
 }
 
@@ -39,7 +38,6 @@ impl State {
         State {
             token: Arc::clone(&state.token),
             servers: Arc::clone(&state.servers),
-            login: Arc::clone(&state.login),
             publish: Arc::clone(&state.publish),
         }
     }
@@ -65,6 +63,8 @@ struct PublishJob {
     deployed: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     finished_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    location: Option<String>,
 }
 
 impl PublishJob {
@@ -78,6 +78,7 @@ impl PublishJob {
             changed: None,
             deployed: None,
             finished_at: None,
+            location: None,
         }
     }
 }
@@ -100,6 +101,7 @@ fn done_job(outcome: &publish::Outcome, project: String, public: String) -> Publ
         changed: Some(outcome.changed),
         deployed: Some(outcome.deployed),
         finished_at: Some(now_secs()),
+        location: outcome.location.clone(),
         ..PublishJob::running("done")
     }
 }
@@ -122,15 +124,11 @@ impl State {
         Ok(Self {
             token: Arc::new(token),
             servers: Arc::new(Mutex::new(HashMap::new())),
-            login: Arc::new(Mutex::new(None)),
             publish: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
     pub fn stop_all(&self) {
-        if let Some(mut login) = self.login.lock().unwrap().take() {
-            login.cancel();
-        }
         let mut servers = self.servers.lock().unwrap_or_else(|e| e.into_inner());
         for (_, mut child) in servers.drain() {
             publish::stop(&mut child);
@@ -187,7 +185,7 @@ pub fn handle(state: &State, request: &Request) -> Response {
         ("GET", ["fonts", "OpenRunde-Bold.woff2"]) => return Response::font(FONT_BOLD),
         ("GET", ["api", "sites"]) => sites::list().map(|s| json!(s)),
         ("GET", ["api", "trash"]) => sites::list_trash().map(|t| json!(t)),
-        ("GET", ["api", "cloudflare"]) => Ok(cloudflare_status(state)),
+        ("GET", ["api", "cloudflare"]) => Ok(cloudflare_status()),
         ("GET", ["api", "cloudflare", "projects"]) => {
             publish::list_projects().map(|p| json!({ "projects": p }))
         }
@@ -295,70 +293,28 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
             stop(state, name)?;
             Ok(json!({ "running": false }))
         }
-        ["api", "cloudflare"] => {
-            let token = string_field(body, "token")?;
-            credentials::store(&token)?;
-            Ok(json!({ "connected": true, "method": "token" }))
-        }
-        ["api", "cloudflare", "login"] => {
-            let mut login = state.login.lock().unwrap();
-            if credentials::session_connected() {
-                bail!("already signed in to Cloudflare");
-            }
-            if let Some(mut previous) = login.take() {
-                previous.cancel();
-            }
-            *login = Some(credentials::start_login()?);
+        ["api", "cloudflare", "connect"] => {
+            crate::cloudflare::start()?;
             Ok(json!({ "started": true }))
         }
-        ["api", "cloudflare", "login", "cancel"] => {
-            if let Some(mut login) = state.login.lock().unwrap().take() {
-                login.cancel();
-            }
-            Ok(json!({ "cancelled": true }))
-        }
         ["api", "cloudflare", "disconnect"] => {
-            if let Some(mut login) = state.login.lock().unwrap().take() {
-                login.cancel();
-            }
-            credentials::clear()?;
-            credentials::logout_session()?;
+            crate::cloudflare::disconnect()?;
             Ok(json!({ "connected": false }))
         }
         ["api", "sites", name, "publish"] => {
             provision::port_of(name)?;
-            if !credentials::connected() {
-                bail!("connect Cloudflare first");
-            }
-            let saved = publish::read_settings(name)?;
-            let project = name.to_string();
-            // The destination always follows the project; a saved public from
-            // an earlier project would keep publishing to the wrong domain.
-            let mut public = body
-                .get("public")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .unwrap_or_default()
-                .to_string();
-            let guessed = format!("https://{project}.pages.dev");
-            if public.is_empty() || public == guessed {
-                // Resolve the domain Cloudflare actually assigned; a guess
-                // from before the project existed would 404 forever.
-                public = publish::default_public(&project);
-            }
-            if public != saved.public {
-                publish::write_settings(
-                    name,
-                    &publish::Settings {
-                        public: public.clone(),
-                        project: project.clone(),
-                    },
-                )?;
-            }
+            let target = publish::active_target();
             let dry_run = body
                 .get("dry_run")
                 .and_then(Value::as_bool)
                 .unwrap_or(false);
+            if dry_run && target == publish::Target::Zip {
+                bail!("a dry run previews Cloudflare publishes only");
+            }
+            let (project, public) = match target {
+                publish::Target::Cloudflare => cloudflare_destination(name, body)?,
+                publish::Target::Zip => (String::new(), zip_destination(name, body)),
+            };
 
             // A finished job stays readable for the dashboard's result strip;
             // only a running one blocks the next attempt.
@@ -418,9 +374,16 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
                     start(&state, &job_name)?;
                     set_phase("exporting");
                     publish::export_site(&job_name, &job_public)?;
-                    set_phase("deploying");
-                    let log = publish::log_path(&job_name)?;
-                    publish::deploy_if_changed_logged(&job_name, &job_public, &job_project, log)
+                    match target {
+                        publish::Target::Cloudflare => {
+                            set_phase("deploying");
+                            publish::deploy_if_changed(&job_name, &job_public, &job_project)
+                        }
+                        publish::Target::Zip => {
+                            set_phase("zipping");
+                            publish::export_zip(&job_name)
+                        }
+                    }
                 })();
                 let mut jobs = publish_jobs.lock().unwrap_or_else(|e| e.into_inner());
                 jobs.insert(
@@ -435,6 +398,7 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
             track_join(&track_name, join);
             Ok(json!({
                 "started": true,
+                "target": target,
                 "project": project,
                 "published": public,
             }))
@@ -456,25 +420,47 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
     }
 }
 
-fn cloudflare_status(state: &State) -> Value {
-    let mut login = state.login.lock().unwrap();
-    let (logging_in, login_url) = match login.as_mut() {
-        Some(active) => {
-            let status = active.update();
-            (status.running, status.url)
-        }
-        None => (false, None),
-    };
-    if !logging_in && credentials::session_connected() {
-        *login = None;
+fn cloudflare_status() -> Value {
+    json!({ "connected": crate::cloudflare::connected() })
+}
+
+/// The Cloudflare destination for a site. The project follows the site slug;
+/// the public address is the one Cloudflare assigned unless a custom domain is set.
+fn cloudflare_destination(name: &str, body: &Value) -> Result<(String, String)> {
+    let saved = publish::read_settings(name)?;
+    let project = name.to_string();
+    let mut public = body
+        .get("public")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or_default()
+        .to_string();
+    let guessed = format!("https://{project}.pages.dev");
+    if public.is_empty() || public == guessed {
+        // A guess from before the project existed would 404 forever.
+        public = publish::default_public(&project);
     }
-    let method = credentials::method();
-    json!({
-        "connected": method.is_some(),
-        "method": method,
-        "logging_in": logging_in,
-        "login_url": login_url,
-    })
+    if public != saved.public {
+        publish::write_settings(
+            name,
+            &publish::Settings {
+                public: public.clone(),
+                project: project.clone(),
+            },
+        )?;
+    }
+    Ok((project, public))
+}
+
+/// The zip target has no hosting address; links use the given public address,
+/// or the local gateway address when none is given.
+fn zip_destination(name: &str, body: &Value) -> String {
+    body.get("public")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|public| !public.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| config::gateway_url(name).trim_end_matches('/').to_string())
 }
 
 fn site_detail(name: &str) -> Result<Value> {
@@ -490,8 +476,8 @@ fn site_detail(name: &str) -> Result<Value> {
         "preview_url": exported.then(|| format!("http://{name}.preview.localhost:{}/", config::GATEWAY_PORT)),
         "running": sites::is_listening(port),
         "exported": exported,
-        "cloudflare_connected": credentials::connected(),
-        "cloudflare_method": credentials::method(),
+        "cloudflare_connected": crate::cloudflare::connected(),
+        "cloudflare_account_id": publish::account_id(),
         "settings": settings,
         "title": provision::project_name(name),
         "deployed": publish::deployed_target(name),

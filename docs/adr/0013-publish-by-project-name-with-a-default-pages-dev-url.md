@@ -6,8 +6,8 @@ project before the first publish.
 
 **Decision: the project name is the only required input.** Kandang derives
 `https://<project>.pages.dev` when the custom domain is empty. The first
-publish runs `wrangler pages project create <project>` (an existing project
-makes Wrangler exit non-zero, which is expected and ignored), then deploys.
+publish creates the project through the Pages REST API when it does not exist,
+then deploys (see ADR 0014).
 The **Custom domain (optional)** field stays for users who add a domain in
 Cloudflare themselves and want the exported links to use it.
 

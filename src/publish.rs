@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
+use std::io;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -8,15 +9,16 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use url::Url;
+use zip::CompressionMethod;
+use zip::write::SimpleFileOptions;
 
+use crate::cloudflare;
 use crate::config;
 use crate::export;
+use crate::pages;
 use crate::provision;
 use crate::sites;
-
-use crate::credentials::WRANGLER;
 
 pub fn log_path(name: &str) -> Result<PathBuf> {
     Ok(provision::site_dir(name)?.join("logs/server.log"))
@@ -80,7 +82,7 @@ pub fn export_site(name: &str, public_base: &str) -> Result<usize> {
     if !sites::is_listening(port) {
         bail!("site {name} is not running");
     }
-    let out = provision::site_dir(name)?.join("public");
+    let out = public_dir(name)?;
     let report = export::export(&export::Options {
         source: Url::parse(&config::gateway_url(name))?,
         public_base: public_base.to_string(),
@@ -90,177 +92,40 @@ pub fn export_site(name: &str, public_base: &str) -> Result<usize> {
     Ok(report.files)
 }
 
-/// Runs wrangler against the exported files; output goes to `log` instead of
-/// the server log.
-pub fn deploy_logged(name: &str, project: &str, log: PathBuf) -> Result<()> {
+fn public_dir(name: &str) -> Result<PathBuf> {
     let dir = provision::site_dir(name)?.join("public");
     if !dir.exists() {
         bail!("nothing exported for {name} yet");
     }
-    cloudflare_pages(&dir, project, Some(log))
+    Ok(dir)
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct Project {
-    pub name: String,
-    pub subdomain: String,
-    pub domains: Vec<String>,
+/// Where a publish goes. A Cloudflare sign-in makes Cloudflare the active
+/// integration; without one, the default is a zip of the export.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Target {
+    Cloudflare,
+    Zip,
 }
 
-fn parse_project_json(text: &str) -> Option<Vec<Project>> {
-    let value: serde_json::Value = serde_json::from_str(text).ok()?;
-    let items = value.get("result")?.as_array()?;
-    if items.is_empty() {
-        return Some(Vec::new());
+pub fn active_target() -> Target {
+    if crate::cloudflare::connected() {
+        Target::Cloudflare
+    } else {
+        Target::Zip
     }
-    items[0].get("domains")?;
-    Some(
-        items
-            .iter()
-            .filter_map(|p| {
-                Some(Project {
-                    name: p.get("name")?.as_str()?.to_string(),
-                    subdomain: p.get("subdomain")?.as_str()?.to_string(),
-                    domains: p
-                        .get("domains")
-                        .and_then(Value::as_array)
-                        .map(|a| {
-                            a.iter()
-                                .filter_map(Value::as_str)
-                                .map(str::to_string)
-                                .collect()
-                        })
-                        .unwrap_or_default(),
-                })
-            })
-            .collect(),
-    )
 }
 
-pub fn parse_project_list(text: &str) -> Vec<Project> {
-    let mut projects = Vec::new();
-    let mut rest = text;
-    while let Some(start) = rest.find("RESPONSE: ") {
-        rest = &rest[start + "RESPONSE: ".len()..];
-        if !rest.starts_with('{') {
-            continue;
-        }
-        let mut depth = 0usize;
-        let mut end = None;
-        let mut in_string = false;
-        let mut escaped = false;
-        for (i, c) in rest.char_indices() {
-            if in_string {
-                if escaped {
-                    escaped = false;
-                } else if c == '\\' {
-                    escaped = true;
-                } else if c == '"' {
-                    in_string = false;
-                }
-                continue;
-            }
-            match c {
-                '"' => in_string = true,
-                '{' => depth += 1,
-                '}' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        end = Some(i + c.len_utf8());
-                        break;
-                    }
-                }
-                _ => {}
-            }
-        }
-        let end = match end {
-            Some(end) => end,
-            None => break,
-        };
-        if let Some(parsed) = parse_project_json(&rest[..end]) {
-            projects.extend(parsed);
-        }
-        rest = &rest[end..];
-    }
-    projects
+/// The Cloudflare Pages projects in the signed-in account.
+pub fn list_projects() -> Result<Vec<pages::Project>> {
+    let account = cloudflare::account_id()?;
+    pages::list_projects(&account)
 }
 
-pub fn list_projects() -> Result<Vec<Project>> {
-    if !crate::credentials::connected() {
-        bail!("connect Cloudflare first");
-    }
-    let token = crate::credentials::load()?;
-    let mut command = Command::new("npx");
-    command
-        .args(["--yes", WRANGLER, "pages", "project", "list"])
-        .env("WRANGLER_LOG", "debug")
-        .env("WRANGLER_LOG_SANITIZE", "false");
-    if let Some(token) = &token {
-        command.env("CLOUDFLARE_API_TOKEN", token);
-    }
-    let output = command
-        .output()
-        .context("running npx (is Node.js installed?)")?;
-    if !output.status.success() {
-        bail!("wrangler pages project list failed");
-    }
-    let text = format!(
-        "{}{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    Ok(parse_project_list(&text))
-}
-
-fn cloudflare_pages(dir: &Path, project: &str, log: Option<PathBuf>) -> Result<()> {
-    // An API token, when present, overrides Wrangler's OAuth session so the
-    // least-privilege credential wins.
-    let token = crate::credentials::load()?;
-    let file = log
-        .map(|path| -> std::io::Result<File> {
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            OpenOptions::new().create(true).append(true).open(&path)
-        })
-        .transpose()
-        .context("opening publish log")?;
-    let mut create = Command::new("npx");
-    create
-        .args(["--yes", WRANGLER, "pages", "project", "create", project])
-        .arg("--production-branch=main");
-    if let Some(token) = &token {
-        create.env("CLOUDFLARE_API_TOKEN", token);
-    }
-    let _ = match &file {
-        Some(f) => create
-            .stdout(f.try_clone()?)
-            .stderr(f.try_clone()?)
-            .status(),
-        None => create.status(),
-    };
-
-    let mut deploy = Command::new("npx");
-    deploy
-        .args(["--yes", WRANGLER, "pages", "deploy"])
-        .arg(dir)
-        .arg(format!("--project-name={project}"))
-        .arg("--branch=main");
-    if let Some(token) = &token {
-        deploy.env("CLOUDFLARE_API_TOKEN", token);
-    }
-    let status = match &file {
-        Some(f) => deploy
-            .stdout(f.try_clone().context("cloning log handle")?)
-            .stderr(f.try_clone().context("cloning log handle")?)
-            .status(),
-        None => deploy.status(),
-    };
-    let status = status.context("running npx (is Node.js installed?)")?;
-    if !status.success() {
-        bail!("wrangler pages deploy failed");
-    }
-    Ok(())
+/// The signed-in Cloudflare account, when connected.
+pub fn account_id() -> Option<String> {
+    cloudflare::account_id().ok()
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -302,56 +167,85 @@ pub struct Outcome {
     pub files: usize,
     pub changed: usize,
     pub deployed: bool,
+    pub target: Target,
+    /// Deployment URL for Cloudflare, archive path for the zip target.
+    pub location: Option<String>,
 }
 
 pub fn plan(name: &str, public: &str, project: &str) -> Result<Outcome> {
-    let dir = provision::site_dir(name)?.join("public");
-    let current = Manifest {
-        target: format!("{public}|{project}"),
-        files: manifest_of(&dir)?,
-    };
+    let current = current_manifest(name, public, project)?;
     let previous = read_manifest(name)?;
     Ok(Outcome {
         files: current.files.len(),
         changed: changed_files(&previous, &current),
         deployed: false,
+        target: Target::Cloudflare,
+        location: None,
     })
 }
 
 pub fn deploy_if_changed(name: &str, public: &str, project: &str) -> Result<Outcome> {
-    deploy_if_changed_logged(name, public, project, log_path(name)?)
-}
-
-/// Like [`deploy_if_changed`], but wrangler output goes to `log`, and the
-/// deployed manifest is recorded so a later plan can count real changes.
-pub fn deploy_if_changed_logged(
-    name: &str,
-    public: &str,
-    project: &str,
-    log: PathBuf,
-) -> Result<Outcome> {
-    let dir = provision::site_dir(name)?.join("public");
-    let current = Manifest {
-        target: format!("{public}|{project}"),
-        files: manifest_of(&dir)?,
-    };
+    let current = current_manifest(name, public, project)?;
     let previous = read_manifest(name)?;
-
     let changed = changed_files(&previous, &current);
-    let outcome = Outcome {
-        files: current.files.len(),
-        changed,
-        deployed: false,
-    };
+    let files = current.files.len();
     if changed == 0 {
-        return Ok(outcome);
+        return Ok(Outcome {
+            files,
+            changed,
+            deployed: false,
+            target: Target::Cloudflare,
+            location: None,
+        });
     }
 
-    deploy_logged(name, project, log)?;
+    let dir = public_dir(name)?;
+    let url = pages::deploy(project, &dir)?;
     write_manifest(name, &current)?;
     Ok(Outcome {
+        files,
+        changed,
         deployed: true,
-        ..outcome
+        target: Target::Cloudflare,
+        location: Some(url),
+    })
+}
+
+/// Packs the exported site into `<site>/export.zip`. Used when no Cloudflare
+/// integration is active.
+pub fn export_zip(name: &str) -> Result<Outcome> {
+    let dir = public_dir(name)?;
+    let out = provision::site_dir(name)?.join("export.zip");
+    let files = write_zip(&dir, &out)?;
+    Ok(Outcome {
+        files,
+        changed: files,
+        deployed: true,
+        target: Target::Zip,
+        location: Some(out.display().to_string()),
+    })
+}
+
+fn write_zip(dir: &Path, out: &Path) -> Result<usize> {
+    let entries = files_under(dir)?;
+    let partial = out.with_extension("zip.part");
+    let file = File::create(&partial).context("creating the export archive")?;
+    let mut zip = zip::ZipWriter::new(file);
+    let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+    for (relative, path) in &entries {
+        zip.start_file(relative.as_str(), options)?;
+        io::copy(&mut File::open(path)?, &mut zip)?;
+    }
+    zip.finish()?;
+    fs::rename(&partial, out).context("saving the export archive")?;
+    Ok(entries.len())
+}
+
+fn current_manifest(name: &str, public: &str, project: &str) -> Result<Manifest> {
+    let dir = provision::site_dir(name)?.join("public");
+    Ok(Manifest {
+        target: format!("{public}|{project}"),
+        files: manifest_of(&dir)?,
     })
 }
 
@@ -374,20 +268,33 @@ fn changed_files(previous: &Manifest, current: &Manifest) -> usize {
 
 fn manifest_of(dir: &Path) -> Result<BTreeMap<String, String>> {
     let mut files = BTreeMap::new();
-    if dir.exists() {
-        collect(dir, dir, &mut files)?;
+    for (relative, path) in files_under(dir)? {
+        files.insert(relative, provision::sha256_of(&path)?);
     }
     Ok(files)
 }
 
-fn collect(root: &Path, dir: &Path, files: &mut BTreeMap<String, String>) -> Result<()> {
+/// Every file under `dir` as (forward-slash relative path, absolute path).
+pub fn files_under(dir: &Path) -> Result<Vec<(String, PathBuf)>> {
+    let mut files = Vec::new();
+    if dir.exists() {
+        collect(dir, dir, &mut files)?;
+    }
+    files.sort();
+    Ok(files)
+}
+
+fn collect(root: &Path, dir: &Path, files: &mut Vec<(String, PathBuf)>) -> Result<()> {
     for entry in fs::read_dir(dir)? {
         let path = entry?.path();
         if path.is_dir() {
             collect(root, &path, files)?;
         } else {
-            let relative = path.strip_prefix(root)?.to_string_lossy().into_owned();
-            files.insert(relative, provision::sha256_of(&path)?);
+            let relative = path
+                .strip_prefix(root)?
+                .to_string_lossy()
+                .replace('\\', "/");
+            files.push((relative, path));
         }
     }
     Ok(())
@@ -413,7 +320,7 @@ fn manifest_path(name: &str) -> Result<PathBuf> {
     Ok(provision::site_dir(name)?.join("published.json"))
 }
 
-/// The public address of the last successful deploy, if any.
+/// The public address of the last successful Cloudflare deploy, if any.
 pub fn deployed_target(name: &str) -> Option<String> {
     let target = read_manifest(name).ok()?.target;
     target.split('|').next().map(str::to_string)
@@ -460,35 +367,6 @@ mod tests {
         let after = manifest("t", &[("a", "1"), ("b", "9"), ("d", "4")]);
         assert_eq!(changed_files(&before, &after), 3);
         assert_eq!(changed_files(&before, &before), 0);
-
-    }
-
-    #[test]
-    fn parses_project_list_from_wrangler_debug_output() {
-        let text = "noise\nDEBUG: fetching pages projects\nRESPONSE: {\"result\":[{\"name\":\"kandang-test-proj\",\"subdomain\":\"kandang-test-proj.pages.dev\",\"domains\":[\"kandang-test-proj.pages.dev\"]}],\"success\":true}\nmore noise";
-        let projects = parse_project_list(text);
-        assert_eq!(projects.len(), 1);
-        assert_eq!(projects[0].name, "kandang-test-proj");
-        assert_eq!(projects[0].subdomain, "kandang-test-proj.pages.dev");
-        assert_eq!(projects[0].domains, vec!["kandang-test-proj.pages.dev"]);
-    }
-
-    #[test]
-    fn parses_single_line_response_json() {
-        let text = "noise\nRESPONSE: {\"result\":[{\"name\":\"p\",\"subdomain\":\"p.pages.dev\",\"domains\":[\"p.pages.dev\"]}],\"success\":true}\nmore";
-        let projects = parse_project_list(text);
-        assert_eq!(projects.len(), 1);
-        assert_eq!(projects[0].name, "p");
-    }
-
-    #[test]
-    fn default_public_uses_the_project_subdomain_when_it_exists() {
-        // default_public hits `wrangler pages project list`; offline it falls
-        // back to the guessed domain.
-        assert_eq!(
-            default_public("no-such-project-xyz"),
-            "https://no-such-project-xyz.pages.dev"
-        );
     }
 
     #[test]
@@ -496,5 +374,34 @@ mod tests {
         let before = manifest("old", &[("a", "1")]);
         let after = manifest("new", &[("a", "1")]);
         assert!(changed_files(&before, &after) > 0);
+    }
+
+    #[test]
+    fn default_public_falls_back_without_a_token() {
+        assert_eq!(
+            default_public("no-such-project-xyz"),
+            "https://no-such-project-xyz.pages.dev"
+        );
+    }
+
+    #[test]
+    fn zip_holds_every_exported_file_at_its_relative_path() {
+        let root = std::env::temp_dir().join(format!("kandang-zip-{}", std::process::id()));
+        let site = root.join("public");
+        fs::create_dir_all(site.join("assets")).unwrap();
+        fs::write(site.join("index.html"), "<h1>hi</h1>").unwrap();
+        fs::write(site.join("assets/app.css"), "body{}").unwrap();
+        let out = root.join("export.zip");
+
+        let written = write_zip(&site, &out).unwrap();
+
+        let mut archive = zip::ZipArchive::new(File::open(&out).unwrap()).unwrap();
+        let mut names: Vec<String> = (0..archive.len())
+            .map(|i| archive.by_index(i).unwrap().name().unwrap().to_string())
+            .collect();
+        names.sort();
+        assert_eq!(written, 2);
+        assert_eq!(names, vec!["assets/app.css", "index.html"]);
+        fs::remove_dir_all(&root).unwrap();
     }
 }

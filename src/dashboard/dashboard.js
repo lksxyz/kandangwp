@@ -335,7 +335,7 @@
         ? el('a', { class: 'address', href: site.preview_url, target: '_blank', rel: 'noopener', text: 'preview' }, el('span', { class: 'sr-only', text: ' (opens in a new tab)' }))
         : null;
       const toggle = el('button', {
-        class: 'btn sm white', type: 'button',
+        class: site.running ? 'btn sm outline danger' : 'btn sm solid', type: 'button',
         'aria-label': `${site.running ? 'Stop' : 'Start'} ${site.name}`,
         onclick: (event) => toggleSite(site, event.currentTarget),
       }, icon(site.running ? 'stop' : 'play'), site.running ? 'Stop' : 'Start');
@@ -387,7 +387,7 @@
       ...[
       statusNode(detail.running),
       el('button', {
-        class: 'btn white', type: 'button',
+        class: detail.running ? 'btn outline danger' : 'btn solid', type: 'button',
         'aria-label': `${detail.running ? 'Stop' : 'Start'} ${detail.name}`,
         onclick: async (event) => {
           await run(event.currentTarget, () => api('POST', `/api/sites/${encodeURIComponent(detail.name)}/${detail.running ? 'stop' : 'start'}`, {}),
@@ -395,7 +395,7 @@
           await openSite(detail.name, state.tab);
         },
       }, icon(detail.running ? 'stop' : 'play'), detail.running ? 'Stop' : 'Start'),
-      detail.running ? el('a', { class: 'btn white', href: detail.url + '/wp-admin', target: '_blank', rel: 'noopener' }, icon('external'), 'Open admin') : null,
+      detail.running ? el('a', { class: 'btn solid', href: detail.url + '/wp-admin', target: '_blank', rel: 'noopener' }, icon('external'), 'Open admin') : null,
       ].filter(Boolean),
     );
   }
@@ -645,9 +645,9 @@
           ? lines.map((domain) => el('p', { class: 'address' },
               el('a', { href: `https://${domain}`, target: '_blank', rel: 'noopener', text: domain })))
           : [el('p', { class: 'muted', text: project ? 'No domains yet. The first publish creates one.' : 'Set a project name to see its domains.' })]),
-        project && d.cloudflare_connected
+        project && d.cloudflare_connected && d.cloudflare_account_id
           ? el('p', { class: 'hint' },
-              el('a', { href: `https://dash.cloudflare.com/pages/view/${project}/domains`, target: '_blank', rel: 'noopener' },
+              el('a', { href: `https://dash.cloudflare.com/${d.cloudflare_account_id}/pages/view/${project}/domains`, target: '_blank', rel: 'noopener' },
                 'Add a custom domain in the Cloudflare dashboard',
                 el('span', { class: 'sr-only', text: ' (opens in a new tab)' })))
           : null,
@@ -662,13 +662,11 @@
       projectInput,
       projectStatus,
       el('div', { class: 'btn-row' },
-        el('button', { class: 'btn solid', type: 'button', id: 'pub-check' }, icon('rocket'), 'Review and publish…'),
+        el('button', { class: 'btn solid', type: 'button', id: 'pub-check' }, icon('rocket'), 'Publish'),
       ),
     );
-    form.querySelector('#pub-check').addEventListener('click', () => reviewPublish(d.name));
-    const connected = d.cloudflare_connected;
-    form.querySelector('#pub-check').disabled = !connected;
-    if (!connected) form.append(el('p', { class: 'hint' }, 'Connect Cloudflare first from ', el('a', { href: '#/cloudflare', text: 'Integrations' }), '.'));
+    form.querySelector('#pub-check').addEventListener('click', () => (d.cloudflare_connected ? reviewPublish(d.name) : exportZip(d.name)));
+    if (!d.cloudflare_connected) form.append(el('p', { class: 'hint' }, 'Not connected to Cloudflare: the export is written as a zip. Connect Cloudflare in ', el('a', { href: '#/cloudflare', text: 'Integrations' }), ' to publish online.'));
 
     return el('div', { class: 'panel' },
       el('div', { class: 'settings' },
@@ -686,9 +684,7 @@
   async function loadCloudflare() {
     const s = await api('GET', '/api/cloudflare');
     const connected = s.connected;
-    const how = s.method === 'token'
-      ? 'Connected with an API token in your desktop keyring.'
-      : 'Connected with browser sign-in, the same session Wrangler uses.';
+    const how = 'Connected to your Cloudflare account. Sign-in renews automatically.';
     const body = $('cloudflare-body');
     body.replaceChildren(
       el('div', { class: 'panel' },
@@ -704,11 +700,8 @@
               el('div', { class: 'btn-row' },
                 connected
                   ? el('button', { class: 'btn outline danger', type: 'button', onclick: () => disconnectCloudflareGlobal() }, icon('unlink'), 'Disconnect Cloudflare')
-                  : [
-                      el('button', { class: 'btn solid', type: 'button', onclick: () => startCloudflareLoginGlobal() }, icon('cloud'), 'Sign in with Cloudflare'),
-                      el('button', { class: 'btn link', type: 'button', text: 'Use an API token', onclick: () => openCloudflare }),
-                    ]),
-              connected ? null : el('p', { class: 'hint', style: 'margin:0', text: 'Connect first to review and publish from a site.' }))),
+                  : el('button', { class: 'btn solid', type: 'button', onclick: (e) => connectCloudflare(e.currentTarget) }, icon('cloud'), 'Connect Cloudflare')),
+              connected ? null : el('p', { class: 'hint', style: 'margin:0', text: 'Without a Cloudflare connection, publishing exports a zip of each site.' }))),
         ),
       ),
     );
@@ -717,7 +710,7 @@
   async function disconnectCloudflareGlobal() {
     const ok = await confirmDialog({
       title: 'Disconnect Cloudflare?',
-      body: 'Publishing stops until you connect again. This also signs out of Wrangler on this machine.',
+      body: 'Publishing stops until you connect again. Sites export as zip files meanwhile.',
       action: 'Disconnect',
       danger: true,
     });
@@ -727,17 +720,19 @@
     await loadStatusBar();
   }
 
-  function startCloudflareLoginGlobal() {
-    startCloudflareLogin(null);
-  }
-
-  function openCloudflare() {
-    const dialog = $('dlg-cloudflare');
-    $('cf-form').reset();
-    $('cf-token').setAttribute('aria-invalid', 'false');
-    $('cf-token-error').hidden = true;
-    dialog.showModal();
-    $('cf-token').focus();
+  async function connectCloudflare(button) {
+    const idle = [...button.childNodes];
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.replaceChildren(icon('cloud'), 'Waiting for sign-in…');
+    const restore = () => {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+      button.replaceChildren(...idle);
+    };
+    const started = await run(null, () => api('POST', '/api/cloudflare/connect', {}), 'Finish signing in to Cloudflare in your browser.');
+    if (started) waitForCloudflare(restore);
+    else restore();
   }
 
   async function loadProjects() {
@@ -765,6 +760,19 @@
     watchPublish(name);
     try {
       await api('POST', `/api/sites/${encodeURIComponent(name)}/publish`, { ...body, dry_run: false });
+    } catch (e) {
+      if (!$('publish-progress').dataset.phase || $('publish-progress').dataset.phase === 'running') {
+        hidePublishProgress();
+      }
+      showError(e.message);
+    }
+  }
+
+  async function exportZip(name) {
+    renderPublishProgress({ phase: 'starting' });
+    watchPublish(name);
+    try {
+      await api('POST', `/api/sites/${encodeURIComponent(name)}/publish`, {});
     } catch (e) {
       if (!$('publish-progress').dataset.phase || $('publish-progress').dataset.phase === 'running') {
         hidePublishProgress();
@@ -870,92 +878,25 @@
     }
   }
 
-  // Cloudflare browser sign-in
-  let loginTimer = null;
-  function stopLoginPolling() {
-    if (loginTimer) clearInterval(loginTimer);
-    loginTimer = null;
-  }
-  async function startCloudflareLogin(name) {
-    const dialog = $('dlg-login');
-    $('login-status').textContent = 'Starting Cloudflare sign-in…';
-    $('login-link').hidden = true;
-    dialog.showModal();
-    try {
-      await api('POST', '/api/cloudflare/login', {});
-    } catch (e) {
-      $('login-status').textContent = e.message;
-      return;
-    }
-    stopLoginPolling();
-    loginTimer = setInterval(async () => {
+  // The browser completes the sign-in on the engine's callback; this page picks up the result.
+  function waitForCloudflare(onDone) {
+    const finish = () => { clearInterval(timer); clearTimeout(limit); onDone(); };
+    const timer = setInterval(async () => {
       try {
         const s = await api('GET', '/api/cloudflare');
-        if (s.login_url) {
-          const link = $('login-link');
-          link.href = s.login_url;
-          link.hidden = false;
-          $('login-status').textContent = 'Waiting for you to approve access in Cloudflare…';
-        }
         if (s.connected) {
-          stopLoginPolling();
-          dialog.close();
+          finish();
           announce('Cloudflare connected.');
-          if (name) await openSite(name, 'publish'); else await loadCloudflare();
+          if (state.detail) await openSite(state.detail.name, 'publish'); else await loadCloudflare();
           await loadStatusBar();
-        } else if (!s.logging_in && s.login_url) {
-          stopLoginPolling();
-          $('login-status').textContent = 'Sign-in did not complete. Close this and try again.';
         }
       } catch (e) {
-        stopLoginPolling();
-        $('login-status').textContent = e.message;
+        finish();
+        announce(`Error: ${e.message}`);
       }
     }, 1500);
+    const limit = setTimeout(() => { finish(); announce('Cloudflare sign-in timed out. Try again.'); }, 5 * 60 * 1000);
   }
-  $('login-cancel').addEventListener('click', async () => {
-    stopLoginPolling();
-    $('dlg-login').close();
-    try { await api('POST', '/api/cloudflare/login/cancel', {}); } catch (e) {}
-  });
-  $('dlg-login').addEventListener('close', () => {
-    stopLoginPolling();
-    api('POST', '/api/cloudflare/login/cancel', {}).catch(() => {});
-  });
-
-  // Cloudflare token dialog
-  $('cf-cancel').addEventListener('click', () => $('dlg-cloudflare').close());
-  $('cf-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const input = $('cf-token');
-    const token = input.value.trim();
-    const error = $('cf-token-error');
-    if (!token) {
-      input.setAttribute('aria-invalid', 'true');
-      error.textContent = 'Paste the API token first.';
-      error.hidden = false;
-      input.focus();
-      return;
-    }
-    const save = $('cf-save');
-    save.disabled = true;
-    try {
-      await api('POST', '/api/cloudflare', { token });
-      input.value = '';
-      $('dlg-cloudflare').close();
-      announce('Cloudflare connected.');
-      if (state.detail) await openSite(state.detail.name, 'publish'); else await loadCloudflare();
-      await loadStatusBar();
-    } catch (e) {
-      input.setAttribute('aria-invalid', 'true');
-      error.textContent = e.message;
-      error.hidden = false;
-      input.focus();
-      announce(`Error: ${e.message}`);
-    } finally {
-      save.disabled = false;
-    }
-  });
 
   // Create-site dialog
   const createDialog = $('dlg-create');

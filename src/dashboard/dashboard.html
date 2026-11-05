@@ -217,7 +217,7 @@
 
 <dialog id="dlg-publish" aria-labelledby="dlg-publish-title" aria-describedby="dlg-publish-body">
   <form method="dialog" class="dialog-body">
-    <h2 id="dlg-publish-title">Review and publish</h2>
+    <h2 id="dlg-publish-title">Publish to Cloudflare</h2>
     <div id="dlg-publish-body"></div>
     <div class="dialog-actions">
       <button class="btn white" value="cancel" type="submit"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6L6 18m12 0L6 6"/></svg>Cancel</button>
@@ -226,33 +226,6 @@
   </form>
 </dialog>
 
-<dialog id="dlg-login" aria-labelledby="dlg-login-title" aria-describedby="dlg-login-body">
-  <div class="dialog-body">
-    <h2 id="dlg-login-title">Sign in with Cloudflare</h2>
-    <p id="dlg-login-body" class="muted">A Cloudflare page opens in your browser. Choose an account and approve access; this window updates by itself.</p>
-    <p id="login-status" role="status">Starting Cloudflare sign-in…</p>
-    <p><a id="login-link" href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener" hidden>Open the Cloudflare sign-in page<span class="sr-only"> (opens in a new tab)</span></a></p>
-    <p class="hint">Kandang uses the same OAuth session as Wrangler, stored in <span class="address">~/.config/.wrangler</span>. For a Pages-only credential, use an API token instead.</p>
-    <div class="dialog-actions">
-      <button class="btn white" type="button" id="login-cancel"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6L6 18m12 0L6 6"/></svg>Cancel</button>
-    </div>
-  </div>
-</dialog>
-
-<dialog id="dlg-cloudflare" aria-labelledby="dlg-cf-title" aria-describedby="dlg-cf-help">
-  <form id="cf-form" class="dialog-body" novalidate>
-    <h2 id="dlg-cf-title">Connect Cloudflare</h2>
-    <p id="dlg-cf-help" class="muted">Create an API token with the permission <strong>Account → Cloudflare Pages → Edit</strong>, then paste it here. <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener">Create a token in Cloudflare</a><span class="sr-only"> (opens in a new tab)</span>.</p>
-    <label for="cf-token">API token</label>
-    <input type="password" id="cf-token" autocomplete="off" spellcheck="false" aria-describedby="cf-token-hint cf-token-error" aria-invalid="false">
-    <p class="hint" id="cf-token-hint">Stored in your desktop keyring. It is never written to a file, logged, or sent back to this page.</p>
-    <span class="field-error" id="cf-token-error" hidden></span>
-    <div class="dialog-actions">
-      <button class="btn white" type="button" id="cf-cancel"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6L6 18m12 0L6 6"/></svg>Cancel</button>
-      <button class="btn solid" type="submit" id="cf-save"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.879 3H11C7.229 3 5.343 3 4.172 4.172S3 7.229 3 11v2c0 3.771 0 5.657 1.172 6.828S7.229 21 11 21h2c3.771 0 5.657 0 6.828-1.172S21 16.771 21 13V8.121c0-.456 0-.685-.024-.904a4 4 0 0 0-.854-2.06c-.138-.173-.3-.334-.622-.657c-.323-.323-.484-.484-.656-.622a4 4 0 0 0-2.061-.854C16.563 3 16.335 3 15.879 3"/><path d="M17 3.5V4c0 1.886 0 2.828-.586 3.414S14.886 8 13 8h-2c-1.886 0-2.828 0-3.414-.586S7 5.886 7 4v-.5m10 17V17c0-1.886 0-2.828-.586-3.414S14.886 13 13 13h-2c-1.886 0-2.828 0-3.414.586S7 15.114 7 17v3.5"/></svg>Save token</button>
-    </div>
-  </form>
-</dialog>
 
 <script src="/dashboard.js" defer></script>
 </body>

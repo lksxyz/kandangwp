@@ -56,9 +56,9 @@ once, then choose Review and publish.
   running.
 - Nothing is deployed when the exported files are unchanged.
 
-Credentials: Cloudflare's browser sign-in (the same OAuth session Wrangler uses)
-or an API token with Account → Cloudflare Pages → Edit. Both stay in the
-keyring.
+Credentials: Cloudflare sign-in opens your browser and stores the OAuth session in
+the desktop keyring (`secret-tool`). Node.js and `wrangler` are not needed. Site
+admin passwords stay in the keyring.
 
 ## Commands
 
