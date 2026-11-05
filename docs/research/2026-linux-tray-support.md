@@ -175,7 +175,7 @@ Sources:
 [sway-tray]: https://github.com/swaywm/sway/blob/master/swaybar/tray/tray.c
 [ubuntu-manifest]: https://cdimage.ubuntu.com/ubuntu/releases/24.04.3/release/ubuntu-24.04.3-desktop-arm64.manifest
 [ubuntu-mode]: https://git.launchpad.net/ubuntu/+source/gnome-shell/tree/debian/ubuntu-session-mods/ubuntu.json
-[xapp-sn]: https://github.com/linuxmint/cinnamon/tree/master/files/usr/share/cinnamon/applets/xapp-status@cinnamon.org
+[xapp-sn]: https://github.com/linuxmint/xapp/tree/master/xapp-sn-watcher
 [xfce-tree]: https://gitlab.xfce.org/xfce/xfce4-panel/-/tree/master/plugins/systray
 
 ## 6. Late-breaking changes (GNOME 45–51 era) — verified
