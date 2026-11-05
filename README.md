@@ -82,6 +82,13 @@ admin passwords stay in the keyring.
 - `$XDG_RUNTIME_DIR/kandang/control.sock` — control socket, mode 0600.
 - `$XDG_RUNTIME_DIR/kandang/engine.log` — output of a detached engine.
 
+**Runtime note.** The bundled FrankenPHP is upstream v1.13.4 packed with UPX
+5.0.2 and hosted in this repository's releases
+(`runtime-frankenphp-1.13.4-upx`), not the upstream release asset. It is about
+52 MB instead of ~175 MB, at the cost of a slower PHP process start (~0.5 s
+instead of ~70 ms). Serving and CLI behavior are unchanged, and existing
+installs re-download it automatically because the pinned SHA-256 changed.
+
 ## Notes
 
 - Sites started from the dashboard stop when the engine stops.
