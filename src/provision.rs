@@ -44,7 +44,7 @@ const SQLITE_PLUGIN: Artifact = Artifact {
 
 const PLUGIN_DIR: &str = "plugin-sqlite-database-integration";
 
-pub fn runtime_dir() -> Result<PathBuf> {
+fn data_runtime_dir() -> Result<PathBuf> {
     Ok(config::data_dir()?.join("runtime"))
 }
 
@@ -59,12 +59,16 @@ pub fn site_dir(name: &str) -> Result<PathBuf> {
     Ok(sites_dir()?.join(name))
 }
 
-pub fn frankenphp() -> Result<PathBuf> {
-    Ok(runtime_dir()?.join(FRANKENPHP.file))
+pub fn is_exported(name: &str) -> bool {
+    site_dir(name).is_ok_and(|dir| dir.join("public/index.html").is_file())
 }
 
-pub fn ensure_runtime() -> Result<()> {
-    let dir = runtime_dir()?;
+pub fn frankenphp() -> Result<PathBuf> {
+    Ok(data_runtime_dir()?.join(FRANKENPHP.file))
+}
+
+fn ensure_runtime() -> Result<()> {
+    let dir = data_runtime_dir()?;
     fs::create_dir_all(&dir)?;
     for artifact in [&FRANKENPHP, &WP_CLI, &WORDPRESS, &SQLITE_PLUGIN] {
         ensure_artifact(artifact, &dir.join(artifact.file))?;
@@ -123,7 +127,7 @@ fn make_executable(path: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn php(args: &[&str], cwd: &Path) -> Result<String> {
+fn php(args: &[&str], cwd: &Path) -> Result<String> {
     let output = Command::new(frankenphp()?)
         .arg("php-cli")
         .args(args)
@@ -143,7 +147,7 @@ pub fn php(args: &[&str], cwd: &Path) -> Result<String> {
 }
 
 fn wp(site: &Path, args: &[&str]) -> Result<String> {
-    let runtime = runtime_dir()?;
+    let runtime = data_runtime_dir()?;
     let phar = runtime.join(WP_CLI.file);
     let path_arg = format!("--path={}", site.display());
     let mut full = vec![
@@ -155,7 +159,7 @@ fn wp(site: &Path, args: &[&str]) -> Result<String> {
 }
 
 fn unzip(zip: &Path, dest: &Path) -> Result<()> {
-    let runtime = runtime_dir()?;
+    let runtime = data_runtime_dir()?;
     let script = runtime.join("unzip.php");
     let zip_s = zip.to_str().context("zip path is not UTF-8")?;
     let dest_s = dest.to_str().context("dest path is not UTF-8")?;
@@ -199,7 +203,7 @@ pub fn create(name: &str, port: u16, project: &str) -> Result<SiteInfo> {
 }
 
 fn build_site(site: &Path, name: &str, port: u16, project: &str) -> Result<SiteInfo> {
-    let runtime = runtime_dir()?;
+    let runtime = data_runtime_dir()?;
     let extract = site.join(".extract");
     fs::create_dir_all(&extract)?;
     unzip(&runtime.join(WORDPRESS.file), &extract)?;
@@ -220,7 +224,7 @@ fn build_site(site: &Path, name: &str, port: u16, project: &str) -> Result<SiteI
         .replace("{SQLITE_PLUGIN}", &format!("{PLUGIN_DIR}/load.php"));
     fs::write(site.join("wp-content/db.php"), db_php)?;
 
-    let url = config::gateway_url(name).trim_end_matches('/').to_string();
+    let url = config::gateway_root(name);
     let admin_password = random_password()?;
     let admin_user = "admin".to_string();
 
@@ -284,7 +288,7 @@ pub fn project_name(name: &str) -> String {
         .unwrap_or_else(|| title_from_slug(name))
 }
 
-pub fn title_from_slug(slug: &str) -> String {
+fn title_from_slug(slug: &str) -> String {
     slug.split('-')
         .filter(|word| !word.is_empty())
         .map(|word| {
@@ -346,7 +350,7 @@ pub fn reset_admin_password(name: &str, password: &str) -> Result<()> {
 
 pub fn ensure_gateway_url(name: &str) -> Result<()> {
     let site = site_dir(name)?;
-    let target = config::gateway_url(name).trim_end_matches('/').to_string();
+    let target = config::gateway_root(name);
     let current = last_line(&wp(&site, &["option", "get", "siteurl"])?);
     if current == target {
         return Ok(());

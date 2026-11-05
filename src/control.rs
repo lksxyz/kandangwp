@@ -1,6 +1,5 @@
-use std::fs::{DirBuilder, File};
+use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
-use std::os::unix::fs::DirBuilderExt;
 use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
 use std::process::{Command, Stdio};
@@ -12,7 +11,7 @@ use anyhow::{Result, bail};
 use crate::config::{self, PORT, UNIT_NAME};
 use crate::systemd;
 
-pub fn send(command: &str) -> Result<String> {
+fn send(command: &str) -> Result<String> {
     send_with_timeout(command, Duration::from_secs(5))
 }
 
@@ -41,12 +40,7 @@ pub fn open_site(name: &str) -> Result<()> {
     if !crate::sites::is_listening(crate::provision::port_of(name)?) {
         site_command("site-start", name)?;
     }
-    Command::new("xdg-open")
-        .arg(config::gateway_url(name))
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()?;
+    xdg_open(&config::gateway_url(name))?;
     Ok(())
 }
 
@@ -87,8 +81,13 @@ pub fn ensure_running() -> Result<()> {
 
 pub fn open_dashboard() -> Result<()> {
     ensure_running()?;
+    xdg_open(&config::dashboard_url())?;
+    Ok(())
+}
+
+fn xdg_open(url: &str) -> Result<()> {
     Command::new("xdg-open")
-        .arg(config::dashboard_url())
+        .arg(url)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -101,10 +100,7 @@ fn log_path() -> Result<std::path::PathBuf> {
 }
 
 fn spawn_detached() -> Result<()> {
-    DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(config::runtime_dir()?)?;
+    config::create_runtime_dir()?;
     let log = File::create(log_path()?)?;
     Command::new(config::executable()?)
         .arg("engine")

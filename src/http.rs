@@ -6,6 +6,13 @@ use serde_json::Value;
 
 const MAX_BODY: usize = 1 << 20;
 
+pub const MIME_JSON: &str = "application/json";
+pub const MIME_HTML: &str = "text/html; charset=utf-8";
+pub const MIME_CSS: &str = "text/css; charset=utf-8";
+pub const MIME_SVG: &str = "image/svg+xml";
+pub const MIME_WOFF2: &str = "font/woff2";
+pub const MIME_TEXT: &str = "text/plain; charset=utf-8";
+
 pub struct Request {
     pub method: String,
     pub path: String,
@@ -29,7 +36,7 @@ impl Response {
     pub fn json(status: u16, value: &Value) -> Self {
         Self {
             status,
-            content_type: "application/json",
+            content_type: MIME_JSON,
             body: value.to_string().into_bytes(),
         }
     }
@@ -37,7 +44,7 @@ impl Response {
     pub fn html(body: String) -> Self {
         Self {
             status: 200,
-            content_type: "text/html; charset=utf-8",
+            content_type: MIME_HTML,
             body: body.into_bytes(),
         }
     }
@@ -45,7 +52,7 @@ impl Response {
     pub fn css(body: &'static str) -> Self {
         Self {
             status: 200,
-            content_type: "text/css; charset=utf-8",
+            content_type: MIME_CSS,
             body: body.as_bytes().to_vec(),
         }
     }
@@ -61,7 +68,7 @@ impl Response {
     pub fn svg(body: String) -> Self {
         Self {
             status: 200,
-            content_type: "image/svg+xml",
+            content_type: MIME_SVG,
             body: body.into_bytes(),
         }
     }
@@ -69,7 +76,7 @@ impl Response {
     pub fn font(body: &'static [u8]) -> Self {
         Self {
             status: 200,
-            content_type: "font/woff2",
+            content_type: MIME_WOFF2,
             body: body.to_vec(),
         }
     }
@@ -77,7 +84,7 @@ impl Response {
     pub fn text(status: u16, body: String) -> Self {
         Self {
             status,
-            content_type: "text/plain; charset=utf-8",
+            content_type: MIME_TEXT,
             body: body.into_bytes(),
         }
     }

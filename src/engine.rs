@@ -1,7 +1,7 @@
 use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::net::{TcpListener, TcpStream};
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::Arc;
 use std::thread;
@@ -14,11 +14,7 @@ use crate::dashboard::{self, State};
 use crate::{gateway, http};
 
 pub fn run() -> Result<()> {
-    let dir = config::runtime_dir()?;
-    fs::DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(&dir)?;
+    config::create_runtime_dir()?;
     let socket = config::socket_path()?;
 
     if UnixStream::connect(&socket).is_ok() {

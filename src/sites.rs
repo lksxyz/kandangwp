@@ -45,19 +45,17 @@ pub fn list() -> Result<Vec<SiteSummary>> {
             name: name.clone(),
             title: provision::project_name(&name),
             port,
-            url: config::gateway_url(&name).trim_end_matches('/').to_string(),
+            url: config::gateway_root(&name),
             running: is_listening(port),
-            preview_url: provision::site_dir(&name)
-                .ok()
-                .filter(|dir| dir.join("public/index.html").is_file())
-                .map(|_| format!("http://{name}.preview.localhost:{}/", config::GATEWAY_PORT)),
+            preview_url: provision::is_exported(&name)
+                .then(|| format!("{}/", config::preview_url(&name))),
         });
     }
     sites.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(sites)
 }
 
-pub fn trash_dir() -> Result<PathBuf> {
+fn trash_dir() -> Result<PathBuf> {
     Ok(provision::sites_dir()?.join(".trash"))
 }
 

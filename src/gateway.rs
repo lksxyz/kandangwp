@@ -7,16 +7,17 @@ use std::time::Duration;
 
 use crate::config;
 use crate::export;
+use crate::http::{MIME_CSS, MIME_HTML, MIME_JSON, MIME_SVG, MIME_TEXT, MIME_WOFF2};
 use crate::{provision, sites};
 
 const MAX_HEAD: usize = 16 * 1024;
 
-pub enum Route {
+enum Route {
     Site(String),
     Preview(String),
 }
 
-pub fn route_for_host(host: &str) -> Option<Route> {
+fn route_for_host(host: &str) -> Option<Route> {
     let hostname = host.split(':').next()?;
     if let Some(name) = hostname.strip_suffix(".preview.localhost") {
         return valid_label(name).then(|| Route::Preview(name.to_string()));
@@ -88,7 +89,7 @@ fn serve_preview(client: &mut TcpStream, name: &str, raw_path: &str) -> io::Resu
         Ok(dir) => dir.join("public"),
         Err(_) => return respond(client, 404, "Unknown site."),
     };
-    if !out.join("index.html").is_file() {
+    if !provision::is_exported(name) {
         return respond(
             client,
             404,
@@ -125,7 +126,7 @@ fn serve_preview(client: &mut TcpStream, name: &str, raw_path: &str) -> io::Resu
         export::stored_public_base(&out),
     ) {
         (true, Some(public)) => {
-            let preview = format!("http://{name}.preview.localhost:{}", config::GATEWAY_PORT);
+            let preview = config::preview_url(name);
             String::from_utf8_lossy(&body)
                 .replace(public.trim_end_matches('/'), &preview)
                 .into_bytes()
@@ -149,20 +150,20 @@ fn redirect(client: &mut TcpStream, location: &str) -> io::Result<()> {
 
 fn mime_for(path: &Path) -> &'static str {
     match path.extension().and_then(|e| e.to_str()).unwrap_or("") {
-        "html" => "text/html; charset=utf-8",
-        "css" => "text/css; charset=utf-8",
+        "html" => MIME_HTML,
+        "css" => MIME_CSS,
         "js" | "mjs" => "application/javascript; charset=utf-8",
-        "json" => "application/json",
+        "json" => MIME_JSON,
         "xml" => "application/xml; charset=utf-8",
-        "txt" => "text/plain; charset=utf-8",
+        "txt" => MIME_TEXT,
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",
         "webp" => "image/webp",
-        "svg" => "image/svg+xml",
+        "svg" => MIME_SVG,
         "ico" => "image/x-icon",
         "woff" => "font/woff",
-        "woff2" => "font/woff2",
+        "woff2" => MIME_WOFF2,
         "mp4" => "video/mp4",
         "pdf" => "application/pdf",
         _ => "application/octet-stream",
@@ -203,7 +204,7 @@ fn respond(client: &mut TcpStream, status: u16, body: &str) -> io::Result<()> {
     };
     write!(
         client,
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: {MIME_TEXT}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     )
 }
