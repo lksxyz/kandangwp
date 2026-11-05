@@ -18,7 +18,12 @@ use crate::{credentials, provision, publish, sites};
 
 const PAGE: &str = include_str!("dashboard.html");
 const STYLE: &str = include_str!("dashboard.css");
-const SCRIPT: &str = include_str!("dashboard.js");
+const SCRIPT: &str = concat!(
+    include_str!("js/core.js"),
+    include_str!("js/sites.js"),
+    include_str!("js/site-actions.js"),
+    include_str!("js/management.js"),
+);
 const MARK: &str = include_str!("../../assets/brand/kandang-mark.svg");
 const FONT_REGULAR: &[u8] = include_bytes!("../../assets/font/OpenRunde-Regular.woff2");
 const FONT_SEMIBOLD: &[u8] = include_bytes!("../../assets/font/OpenRunde-Semibold.woff2");
