@@ -460,7 +460,7 @@ fn zip_destination(name: &str, body: &Value) -> String {
         .map(str::trim)
         .filter(|public| !public.is_empty())
         .map(str::to_string)
-        .unwrap_or_else(|| config::gateway_url(name).trim_end_matches('/').to_string())
+        .unwrap_or_else(|| config::gateway_root(name))
 }
 
 fn site_detail(name: &str) -> Result<Value> {
@@ -472,8 +472,8 @@ fn site_detail(name: &str) -> Result<Value> {
     Ok(json!({
         "name": name,
         "port": port,
-        "url": config::gateway_url(name).trim_end_matches('/'),
-        "preview_url": exported.then(|| format!("http://{name}.preview.localhost:{}/", config::GATEWAY_PORT)),
+        "url": config::gateway_root(name),
+        "preview_url": exported.then(|| format!("{}/", config::preview_url(name))),
         "running": sites::is_listening(port),
         "exported": exported,
         "cloudflare_connected": crate::cloudflare::connected(),

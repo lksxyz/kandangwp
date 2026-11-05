@@ -209,9 +209,9 @@ fn main() -> Result<()> {
                     anyhow::bail!("--public is required when Cloudflare is connected")
                 }
                 (publish::Target::Cloudflare, Some(public)) => public,
-                (publish::Target::Zip, public) => public.unwrap_or_else(|| {
-                    config::gateway_url(&name).trim_end_matches('/').to_string()
-                }),
+                (publish::Target::Zip, public) => {
+                    public.unwrap_or_else(|| config::gateway_root(&name))
+                }
             };
             let project = project.unwrap_or_else(|| name.clone());
             let mut server = publish::serve(&name, true)?;
