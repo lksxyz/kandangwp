@@ -23,8 +23,8 @@ struct Artifact {
 
 const FRANKENPHP: Artifact = Artifact {
     file: "frankenphp",
-    url: "https://github.com/php/frankenphp/releases/download/v1.13.4/frankenphp-linux-x86_64",
-    sha256: "11691b76b0e0dc405ecfd9c18add811a9b6360f2e231cc14ca1634450f7339d2",
+    url: "https://github.com/lksxyz/kandangwp/releases/download/runtime-frankenphp-1.13.4-upx/frankenphp-linux-x86_64-upx",
+    sha256: "725ce5965d6170fc136f0302885390fcaa6b4daa3d06cd3c1b688e0c1e15dc50",
 };
 const WP_CLI: Artifact = Artifact {
     file: "wp-cli.phar",
