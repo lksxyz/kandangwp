@@ -1,4 +1,6 @@
 # One bundled PHP version for all sites
+Status: superseded by ADR 0018. One tested PHP version still holds, but the
+runtime is downloaded at provisioning instead of shipping inside the AppImage.
 
 Kandang ships exactly one tested PHP version inside the AppImage, and every Site
 runs on it. Per-site PHP versions were considered and rejected for the MVP: they
