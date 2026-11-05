@@ -1,7 +1,7 @@
 # Kandang identity
 
 The mark is a pen: three pickets with pointed tops and two rails, drawn in
-white on the dashboard accent. It reads as a fence at a glance and as a
+white on the dashboard accent. It reads as a fence at a glance and as an
 enclosure for sites that are kept local until published.
 
 The identity is calm and precise: one colour, geometric construction, no
@@ -13,13 +13,9 @@ visual language (see [DESIGN.md](../../DESIGN.md)).
 | File | Use |
 |------|-----|
 | `kandang-mark.svg` | App icon, favicon, Dashboard sidebar. 64 px canvas, mark from 24 px up |
-| `kandang-mark-small.svg` | 16 px app icon only; the rails are dropped so the fence stays legible |
-| `kandang-logo.svg` | Horizontal lockup: mark plus outlined "Kandang" wordmark (Noto Sans Medium, no font dependency) |
 | `kandang-symbolic.svg` | Tray icon, engine running (monochrome, theme-coloured) |
 | `kandang-stopped-symbolic.svg` | Tray icon, engine stopped (40% opacity) |
-| `favicon.ico` | 16, 32, and 48 px favicon |
 | `png/kandang-<size>.png` | 16–512 px app icon raster |
-| `tray/kandang-*-symbolic-<size>.png` | 16–32 px tray rasters |
 
 ## Colour
 

@@ -22,5 +22,5 @@ a second system to keep in sync).
 
 **Consequences:** plugins and features that need a server (forms, search,
 comments, WooCommerce, logins) are dropped or moved to third-party services.
-Direct Upload projects cannot switch to Git later, and Wrangler uploads are
+Direct Upload projects cannot switch to Git later. Cloudflare Pages on the Free plan is
 limited to 20,000 files and 25 MiB per file.

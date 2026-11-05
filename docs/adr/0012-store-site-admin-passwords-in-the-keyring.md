@@ -32,5 +32,5 @@ Alternatives considered:
 
 Consequences: the keyring must be unlocked to reveal the password, and anyone
 who can run as the user can read it. That matches the local desktop trust level
-and the existing Cloudflare credential path (ADR-0011). The dashboard never
+and the Cloudflare sign-in session in the keyring (ADR 0017). The dashboard never
 writes the password to a log or a site file.

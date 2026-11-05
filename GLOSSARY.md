@@ -60,6 +60,10 @@ local version. Export never changes the local Site.
 
 Exporting a Site and making the result live at its Public Address.
 
+## Pages Project
+
+The Cloudflare Pages project a Site publishes to. Kandang creates it on the Site's first Publish and names it after the Site slug (e.g. `project-pemda-01`), so its default `*.pages.dev` address follows the Site name. It is separate from the Project Name, which is only the readable label entered at creation.
+
 ## Public Address
 
 The address visitors use for a published Site, e.g. `https://example.com`. It
