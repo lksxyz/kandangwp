@@ -43,7 +43,7 @@ You choose (or nowhere).
 | **KDE Plasma** (6.x) | ✅ Yes | SNI (+ XEmbed fallback via `xembed-sni-proxy`) | System Tray applet in `plasma-workspace` is a full SNI host (`applets/systemtray/statusnotifieritemhost.cpp`). Legacy X11/XEmbed tray icons are bridged by `plasma-xembedsniproxy`. Works on X11 and Wayland. [1][plasma-sni] |
 | **GNOME Shell** (45–51) | ❌ **No native support** | requires extension | No StatusNotifier code anywhere in `gnome-shell` main; legacy XEmbed tray code only compiles with XWayland (`if have_xwayland: subdir('tray')`). Needs the **"AppIndicator and KStatusNotifierItem Support"** extension (3.2 M downloads, still built for GNOME 45 → 51). [2][gnome-ext][gnome-meson][gnome-tree] |
 | — Ubuntu (GNOME session) | ✅ out of the box (via extension) | SNI | Ubuntu preinstalls `gnome-shell-extension-appindicator` (on the 24.04.3 desktop image) and its own maintained fork `ubuntu-appindicators@ubuntu.com` is **auto-enabled** by the Ubuntu session mode (`enabledExtensions` in distro gnome-shell packaging). Also ships `libayatana-appindicator3`. [3][ubuntu-manifest][ubuntu-mode] |
-| **XFCE** (4.16+) | ✅ Yes | SNI + XEmbed (same plugin) | `xfce4-statusnotifier-plugin` was merged into `xfce4-panel` `plugins/systray` in Aug 2020 (shipped in 4.16): `sn-*` backend = SNI, `systray-manager` = legacy XEmbed. [4][xfce-commit][xfce-tree] |
+| **XFCE** (4.16+) | ✅ Yes | SNI + XEmbed (same plugin) | `xfce4-statusnotifier-plugin` was merged into `xfce4-panel` `plugins/systray` in Aug 2020 (shipped in 4.16): `sn-*` backend = SNI, `systray-manager` = legacy XEmbed. [4][xfce-tree] |
 | **Cinnamon** | ✅ Yes (XEmbed native; SNI via bundled bridge) | XEmbed + XApp/SNI | Ships a legacy XEmbed "System Tray" applet and the "XApp Status Applet". AppIndicator/SNI apps appear because Mint's **xapps** ships `xapp-sn-watcher`, a daemon that claims `org.kde.StatusNotifierWatcher` and mirrors SNI items into `XAppStatusIcon`s. [5][cin-applets][xapp-sn] |
 | **MATE** (1.18+) | ✅ Yes | SNI (+ legacy XEmbed applet) | mate-panel 1.18.0 (2018) added StatusNotifier support to the notification area; a separate legacy "Notification Area" (XEmbed) applet also exists. [6][mate-news] |
 | **LXQt** | ✅ Yes | SNI (+ XEmbed plugin) | `lxqt-panel` builds the **"Status Notifier"** (SNI) plugin by default (`STATUSNOTIFIER_PLUGIN Yes`), and the legacy X11 **"System Tray"** XEmbed plugin is also enabled by default. [7][lxqt-cmake] |
@@ -155,6 +155,28 @@ Sources:
 [tauri-tray]: https://v2.tauri.app/develop/system-tray/
 [trayicon]: https://github.com/tauri-apps/tray-icon/blob/dev/README.md
 [ksni]: https://docs.rs/ksni
+[arch-sway]: https://wiki.archlinux.org/title/Sway
+[awesome-api]: https://awesomewm.org/doc/api/classes/wibox.widget.systray.html
+[awesome-readme]: https://github.com/awesomeWM/awesome/blob/master/docs/01-readme.md
+[budgie]: https://github.com/BuddiesOfBudgie/budgie-desktop/blob/main/src/panel/applets/tray/TrayItem.vala
+[cin-applets]: https://github.com/linuxmint/cinnamon/tree/master/files/usr/share/cinnamon/applets/systray@cinnamon.org
+[dwm-patch]: https://dwm.suckless.org/patches/systray/
+[gnome-ext]: https://extensions.gnome.org/extension/615/appindicator-support/
+[gnome-meson]: https://github.com/GNOME/gnome-shell/blob/main/src/meson.build
+[gnome-tree]: https://github.com/GNOME/gnome-shell
+[hypr-bars]: https://wiki.hyprland.org/Useful-Utilities/Status-Bars/
+[i3]: https://i3wm.org/docs/userguide.html
+[lxqt-cmake]: https://github.com/lxqt/lxqt-panel/blob/master/CMakeLists.txt
+[mate-news]: https://github.com/mate-desktop/mate-panel/blob/master/NEWS
+[plasma-sni]: https://github.com/KDE/plasma-workspace/tree/master/applets/systemtray
+[qtile-systray]: https://github.com/qtile/qtile/blob/master/libqtile/widget/systray.py
+[qtile-wayland]: https://github.com/qtile/qtile/blob/master/docs/manual/wayland_status.rst
+[sway-commit]: https://github.com/swaywm/sway/commit/843ad38b
+[sway-tray]: https://github.com/swaywm/sway/blob/master/swaybar/tray/tray.c
+[ubuntu-manifest]: https://cdimage.ubuntu.com/ubuntu/releases/24.04.3/release/ubuntu-24.04.3-desktop-arm64.manifest
+[ubuntu-mode]: https://git.launchpad.net/ubuntu/+source/gnome-shell/tree/debian/ubuntu-session-mods/ubuntu.json
+[xapp-sn]: https://github.com/linuxmint/cinnamon/tree/master/files/usr/share/cinnamon/applets/xapp-status@cinnamon.org
+[xfce-tree]: https://gitlab.xfce.org/xfce/xfce4-panel/-/tree/master/plugins/systray
 
 ## 6. Late-breaking changes (GNOME 45–51 era) — verified
 

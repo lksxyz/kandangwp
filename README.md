@@ -12,7 +12,6 @@ background engine, and the engine serves a dashboard at
 
 - Linux with a tray host (the applet uses StatusNotifierItem)
 - Rust, to build it
-- Node.js 22 or newer, if you publish to Cloudflare Pages
 - A Cloudflare account, if you publish
 
 ## Build
