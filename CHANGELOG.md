@@ -10,6 +10,9 @@ All notable changes to Kandang. Versions follow `Cargo.toml`.
   you press it, with a live percentage and the file being fetched.
 - Dashboard actions (new site, start, publish, password reset, restore, purge)
   stay disabled until the runtime is ready.
+- `kandang runtime install` and `kandang runtime status` for installing the
+  runtime from the terminal. Install prints per-file progress and refuses while
+  the engine is running, so the dashboard and the CLI never write the same files.
 - Byte-level download progress for FrankenPHP, WordPress, WP-CLI, and the
   SQLite plugin. Each file is still checked against its pinned SHA-256.
 - `scripts/build-appimage.sh` builds the AppImage reproducibly.

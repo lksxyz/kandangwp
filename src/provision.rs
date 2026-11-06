@@ -96,7 +96,7 @@ pub fn ensure_runtime(progress: &mut dyn FnMut(&str, u64, u64)) -> Result<()> {
 
 /// True when every runtime artifact is on disk. Downloads land in a `.part`
 /// file and are renamed only after the hash checks out, so presence is enough.
-fn runtime_present() -> bool {
+pub fn runtime_installed() -> bool {
     let Ok(dir) = data_runtime_dir() else {
         return false;
     };
@@ -252,8 +252,10 @@ pub fn create(name: &str, port: u16, project: &str) -> Result<SiteInfo> {
     if target.exists() {
         bail!("a site named {name} already exists");
     }
-    if !runtime_present() {
-        bail!("the runtime is not installed; download it from the dashboard first");
+    if !runtime_installed() {
+        bail!(
+            "the runtime is not installed; run `kandang runtime install` or download it from the dashboard"
+        );
     }
 
     fs::create_dir_all(&target)?;

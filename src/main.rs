@@ -48,6 +48,11 @@ enum Command {
         #[command(subcommand)]
         action: Autostart,
     },
+    /// Download and check the runtime (FrankenPHP, WordPress, WP-CLI, SQLite plugin)
+    Runtime {
+        #[command(subcommand)]
+        action: RuntimeAction,
+    },
     /// Export the running local site to static files
     Export {
         /// Local site address, e.g. http://blog.test/
@@ -110,6 +115,14 @@ enum Autostart {
     Disable,
 }
 
+#[derive(Subcommand)]
+enum RuntimeAction {
+    /// Download and verify the runtime; refuses while the engine is running
+    Install,
+    /// Show whether the runtime is installed
+    Status,
+}
+
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Engine => engine::run(),
@@ -160,6 +173,42 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
+        Command::Runtime { action } => match action {
+            RuntimeAction::Install => {
+                if provision::runtime_installed() {
+                    println!("runtime already installed");
+                    return Ok(());
+                }
+                if control::is_running() {
+                    anyhow::bail!(
+                        "the engine is running; download the runtime from the dashboard, or stop the engine first"
+                    );
+                }
+                let mut shown: Option<(String, u64)> = None;
+                provision::ensure_runtime(&mut |file, done, total| {
+                    let percent = if total == 0 { 0 } else { done * 100 / total };
+                    if shown.as_ref().map(|(f, p)| (f.as_str(), *p)) != Some((file, percent)) {
+                        eprint!("\r{percent:>3}%  {file:<24}");
+                        shown = Some((file.to_string(), percent));
+                    }
+                })?;
+                eprintln!();
+                println!("runtime installed");
+                Ok(())
+            }
+            RuntimeAction::Status => {
+                let installed = provision::runtime_installed();
+                println!(
+                    "{}",
+                    if installed {
+                        "installed"
+                    } else {
+                        "not installed"
+                    }
+                );
+                Ok(())
+            }
+        },
         Command::Site { action } => match action {
             SiteAction::Create { name, port } => {
                 let info = provision::create(&name, port, &name)?;
