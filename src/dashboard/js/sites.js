@@ -19,6 +19,7 @@
   }
 
   async function render() {
+    if (!runtimeReady()) return;
     const r = route();
     stopLogs();
     showView(r.view);
@@ -50,6 +51,7 @@
         ? el('a', { class: 'address', href: site.preview_url, target: '_blank', rel: 'noopener', text: 'preview' }, el('span', { class: 'sr-only', text: ' (opens in a new tab)' }))
         : null;
       const toggle = el('button', {
+        disabled: runtimeReady() ? null : true,
         class: site.running ? 'btn sm outline danger' : 'btn sm solid', type: 'button',
         'aria-label': `${site.running ? 'Stop' : 'Start'} ${site.name}`,
         onclick: (event) => toggleSite(site, event.currentTarget),
@@ -102,6 +104,7 @@
       ...[
       statusNode(detail.running),
       el('button', {
+        disabled: runtimeReady() ? null : true,
         class: detail.running ? 'btn outline danger' : 'btn solid', type: 'button',
         'aria-label': `${detail.running ? 'Stop' : 'Start'} ${detail.name}`,
         onclick: async (event) => {

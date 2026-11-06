@@ -33,12 +33,12 @@
           el('div', { class: 'row-title', text: item.name }),
         ),
         el('div', { class: 'row-actions' },
-          el('button', { class: 'btn sm white', type: 'button', 'aria-label': `Restore ${item.name}`,
+          el('button', { class: 'btn sm white', type: 'button', 'aria-label': `Restore ${item.name}`, disabled: runtimeReady() ? null : true,
             onclick: async (event) => {
               await run(event.currentTarget, () => api('POST', `/api/trash/${encodeURIComponent(item.id)}/restore`, {}), `${item.name} restored.`);
               await loadTrash();
             } }, icon('restore'), 'Restore'),
-          el('button', { class: 'btn sm outline danger', type: 'button', 'aria-label': `Delete ${item.name} permanently`, onclick: () => purge(item) }, icon('trash'), 'Purge'),
+          el('button', { class: 'btn sm outline danger', type: 'button', 'aria-label': `Delete ${item.name} permanently`, disabled: runtimeReady() ? null : true, onclick: () => purge(item) }, icon('trash'), 'Purge'),
         ),
       ));
     }
@@ -264,7 +264,7 @@
 
   // Quiet polling: refresh data, pause while hidden, announce nothing.
   setInterval(() => {
-    if (document.hidden) return;
+    if (document.hidden || !runtimeReady()) return;
     const r = route();
     if (r.view === 'sites') loadSites().catch(() => {});
     if (r.view === 'trash') loadTrash().catch(() => {});
@@ -278,5 +278,74 @@
   // Count badges are visible on every view.
   Promise.all([loadSites(), loadTrash()]).catch(() => {});
   loadStatusBar().catch(() => {});
+
+  // Runtime setup: the user starts the download from this page. Progress and
+  // failures show here; the rest of the dashboard appears once the runtime is ready.
+  const SETUP_VIEWS = ['view-sites', 'view-site', 'view-trash', 'view-cloudflare', 'view-engine'];
+
+  function updateRuntimeUI() {
+    const r = state.runtime;
+    const setup = $('runtime-setup');
+    if (r && runtimeReady()) {
+      setup.hidden = true;
+      return;
+    }
+    setup.hidden = false;
+    for (const id of SETUP_VIEWS) $(id).hidden = true;
+    if (!r) {
+      $('runtime-checking').hidden = false;
+      $('runtime-intro').hidden = true;
+      $('runtime-start').hidden = true;
+      $('runtime-progress').hidden = true;
+      $('runtime-error').hidden = true;
+      return;
+    }
+    const preparing = r.status === 'preparing';
+    const failed = r.status === 'failed';
+    const percent = Math.max(0, Math.min(100, r.percent || 0));
+    $('runtime-checking').hidden = true;
+    $('runtime-intro').hidden = preparing;
+    $('runtime-start').hidden = preparing;
+    $('runtime-start').textContent = failed ? 'Try again' : 'Download runtime';
+    $('runtime-progress').hidden = !preparing;
+    $('runtime-bar').value = percent;
+    $('runtime-percent').textContent = `${percent}% downloaded`;
+    $('runtime-file').textContent = r.file ? `Downloading ${r.file}` : 'Starting download…';
+    $('runtime-error').hidden = !failed;
+    $('runtime-error').textContent = failed ? `Download failed: ${r.error || 'unknown error'}` : '';
+  }
+
+  async function refreshRuntime() {
+    try {
+      const next = await api('GET', '/api/runtime');
+      const was = state.runtime && state.runtime.status;
+      state.runtime = next;
+      updateRuntimeUI();
+      if (next.status === 'ready') {
+        if (was !== 'ready') await render();
+        return;
+      }
+      if (next.status === 'preparing') setTimeout(refreshRuntime, 1000);
+    } catch {
+      setTimeout(refreshRuntime, 3000);
+    }
+  }
+
+  $('runtime-start').addEventListener('click', async () => {
+    const button = $('runtime-start');
+    button.disabled = true;
+    try {
+      await api('POST', '/api/runtime/provision', {});
+      state.runtime = { status: 'preparing', percent: 0 };
+      updateRuntimeUI();
+      refreshRuntime();
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  refreshRuntime();
   render().catch((e) => showError(e.message));
 })();

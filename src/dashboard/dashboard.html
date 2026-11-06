@@ -66,6 +66,18 @@
       <span id="error-text"></span>
       <button class="alert-close" type="button" aria-label="Dismiss error" onclick="dismissError()">&#215;</button>
     </div>
+    <section id="runtime-setup" class="panel" aria-labelledby="runtime-setup-title" hidden>
+      <h1 id="runtime-setup-title" tabindex="-1">Set up Kandang</h1>
+      <p class="sub" id="runtime-checking" hidden>Checking the runtime…</p>
+      <p class="sub" id="runtime-intro">Kandang needs its runtime before it can run sites: FrankenPHP, WordPress, WP-CLI, and the SQLite plugin. The download happens once, about 100 MB.</p>
+      <div id="runtime-progress" hidden>
+        <progress id="runtime-bar" max="100" value="0" aria-label="Runtime download progress"></progress>
+        <p id="runtime-percent" role="status" aria-live="polite"></p>
+        <p class="hint" id="runtime-file"></p>
+      </div>
+      <p class="hint" id="runtime-error" role="alert" hidden></p>
+      <div class="btn-row"><button class="btn solid" type="button" id="runtime-start">Download runtime</button></div>
+    </section>
     <div id="publish-progress" class="publish-progress" data-phase="idle" role="status" aria-live="polite" hidden>
       <span class="spinner" aria-hidden="true"></span>
       <span class="steps" id="publish-progress-steps"></span>

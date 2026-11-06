@@ -4,7 +4,7 @@
   function adminPasswordButtons(name, cell) {
     cell.replaceChildren(
       el('button', { class: 'btn sm soft', type: 'button', onclick: () => revealAdminPassword(name, cell) }, icon('view'), 'Show password'),
-      el('button', { class: 'btn sm outline danger', type: 'button', 'data-action': 'reset', onclick: () => resetAdminPassword(name, cell) }, icon('lock'), 'Reset password'),
+      el('button', { class: 'btn sm outline danger', type: 'button', 'data-action': 'reset', disabled: runtimeReady() ? null : true, onclick: () => resetAdminPassword(name, cell) }, icon('lock'), 'Reset password'),
     );
   }
 
@@ -180,7 +180,7 @@
       projectInput,
       projectStatus,
       el('div', { class: 'btn-row' },
-        el('button', { class: 'btn solid', type: 'button', id: 'pub-check' }, icon('rocket'), 'Publish'),
+        el('button', { class: 'btn solid', type: 'button', id: 'pub-check', disabled: runtimeReady() ? null : true }, icon('rocket'), 'Publish'),
       ),
     );
     form.querySelector('#pub-check').addEventListener('click', () => (d.cloudflare_connected ? reviewPublish(d.name) : exportZip(d.name)));

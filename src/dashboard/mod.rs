@@ -34,6 +34,7 @@ pub struct State {
     token: Arc<String>,
     servers: Arc<Mutex<HashMap<String, Child>>>,
     publish: Arc<Mutex<HashMap<String, PublishJob>>>,
+    runtime: Arc<Mutex<RuntimeStatus>>,
 }
 
 impl State {
@@ -43,6 +44,7 @@ impl State {
         State {
             token: Arc::clone(&state.token),
             servers: Arc::clone(&state.servers),
+            runtime: Arc::clone(&state.runtime),
             publish: Arc::clone(&state.publish),
         }
     }
@@ -88,6 +90,91 @@ impl PublishJob {
     }
 }
 
+/// Readiness of the runtime (FrankenPHP, WordPress, WP-CLI, SQLite plugin).
+/// The user starts the download from the dashboard; the engine never does.
+#[derive(Clone, Serialize)]
+struct RuntimeStatus {
+    status: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    percent: Option<u64>,
+}
+
+impl RuntimeStatus {
+    fn idle() -> Self {
+        Self {
+            status: "idle",
+            error: None,
+            file: None,
+            percent: None,
+        }
+    }
+}
+
+impl State {
+    pub fn runtime_ready(&self) -> bool {
+        self.runtime
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .status
+            == "ready"
+    }
+
+    /// Starts the download in the background unless one is already running.
+    /// Only the dashboard's download button calls this.
+    pub fn start_provisioning(&self) {
+        {
+            let mut runtime = self.runtime.lock().unwrap_or_else(|e| e.into_inner());
+            if runtime.status == "preparing" {
+                return;
+            }
+            *runtime = RuntimeStatus {
+                status: "preparing",
+                error: None,
+                file: None,
+                percent: Some(0),
+            };
+        }
+        let state = State::mirror(self);
+        thread::spawn(move || {
+            let result = provision::ensure_runtime(&mut |file, done, total| {
+                let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner());
+                runtime.file = Some(file.to_string());
+                runtime.percent = Some(if total == 0 {
+                    0
+                } else {
+                    (done * 100 / total).min(100)
+                });
+            });
+            let outcome = match result {
+                Ok(()) => RuntimeStatus {
+                    status: "ready",
+                    error: None,
+                    file: None,
+                    percent: None,
+                },
+                Err(e) => RuntimeStatus {
+                    status: "failed",
+                    error: Some(format!("{e:#}")),
+                    file: None,
+                    percent: None,
+                },
+            };
+            *state.runtime.lock().unwrap_or_else(|e| e.into_inner()) = outcome;
+        });
+    }
+}
+
+fn require_runtime(state: &State) -> Result<()> {
+    if state.runtime_ready() {
+        return Ok(());
+    }
+    bail!("the runtime is still downloading; site actions unlock when it finishes")
+}
+
 fn now_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -130,6 +217,7 @@ impl State {
             token: Arc::new(token),
             servers: Arc::new(Mutex::new(HashMap::new())),
             publish: Arc::new(Mutex::new(HashMap::new())),
+            runtime: Arc::new(Mutex::new(RuntimeStatus::idle())),
         })
     }
 
@@ -194,6 +282,9 @@ pub fn handle(state: &State, request: &Request) -> Response {
         ("GET", ["api", "cloudflare", "projects"]) => {
             publish::list_projects().map(|p| json!({ "projects": p }))
         }
+        ("GET", ["api", "runtime"]) => Ok(json!(
+            *state.runtime.lock().unwrap_or_else(|e| e.into_inner())
+        )),
         ("GET", ["api", "status"]) => Ok(json!({
             "dashboard_port": PORT,
             "gateway_port": config::GATEWAY_PORT,
@@ -249,7 +340,12 @@ fn parse_body(request: &Request) -> Result<Value> {
 
 fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
     match segments {
+        ["api", "runtime", "provision"] => {
+            state.start_provisioning();
+            Ok(json!({ "started": true }))
+        }
         ["api", "sites"] => {
+            require_runtime(state)?;
             #[derive(Deserialize)]
             struct Create {
                 name: String,
@@ -285,6 +381,7 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
         }
         ["api", "sites", name, "admin-password", "reset"] => {
             provision::port_of(name)?;
+            require_runtime(state)?;
             let password = provision::random_password()?;
             provision::reset_admin_password(name, &password)?;
             let stored = credentials::store_site_password(name, &password).is_ok();
@@ -308,6 +405,7 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
         }
         ["api", "sites", name, "publish"] => {
             provision::port_of(name)?;
+            require_runtime(state)?;
             let target = publish::active_target();
             let dry_run = body
                 .get("dry_run")
@@ -497,6 +595,7 @@ fn string_field(body: &Value, key: &str) -> Result<String> {
 }
 
 pub fn start_site(state: &State, name: &str) -> Result<bool> {
+    require_runtime(state)?;
     start(state, name)
 }
 

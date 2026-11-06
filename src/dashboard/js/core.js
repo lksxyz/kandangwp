@@ -1,7 +1,8 @@
 (() => {
   const token = document.querySelector('meta[name="kandang-token"]').content;
   const $ = (id) => document.getElementById(id);
-  const state = { sites: [], trash: [], detail: null, tab: 'overview', logTimer: null, autoScroll: true, cfProjects: null, publishTimer: null, publishSite: null, publishStartedAt: 0 };
+  const state = { sites: [], trash: [], detail: null, tab: 'overview', logTimer: null, autoScroll: true, cfProjects: null, publishTimer: null, publishSite: null, publishStartedAt: 0, runtime: null };
+  const runtimeReady = () => !!state.runtime && state.runtime.status === 'ready';
 
   const PUBLISH_PHASES = [
     { id: 'starting', label: 'Starting site' },
