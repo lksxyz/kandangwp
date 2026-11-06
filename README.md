@@ -72,6 +72,7 @@ admin passwords stay in the keyring.
 | `kandang publish <name> --public … --project …` | Export and deploy |
 | `kandang doctor` | Check runtime, port, systemd, and tray support |
 | `kandang autostart enable` / `disable` | Start the engine at login |
+| `kandang runtime install` / `status` | Download and check the runtime (about 100 MB), or show whether it is installed. Refuses while the engine runs; use the dashboard then |
 
 ## Files
 

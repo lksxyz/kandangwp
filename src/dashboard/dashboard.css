@@ -545,3 +545,9 @@
     dl.facts .fact { grid-template-columns: 104px minmax(0, 1fr); gap: 2px 12px; }
     .dialog-actions { flex-wrap: wrap; }
   }
+
+#runtime-bar { width: 100%; height: 10px; accent-color: var(--accent); }
+#runtime-progress { margin: 16px 0 8px; }
+#runtime-setup > h1 { margin-bottom: 12px; }
+#runtime-setup > .sub { margin: 0 0 16px; }
+#runtime-setup .btn-row { margin-top: 24px; }

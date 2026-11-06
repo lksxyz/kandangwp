@@ -67,18 +67,69 @@ pub fn frankenphp() -> Result<PathBuf> {
     Ok(data_runtime_dir()?.join(FRANKENPHP.file))
 }
 
-fn ensure_runtime() -> Result<()> {
+pub fn ensure_runtime(progress: &mut dyn FnMut(&str, u64, u64)) -> Result<()> {
     let dir = data_runtime_dir()?;
     fs::create_dir_all(&dir)?;
-    for artifact in [&FRANKENPHP, &WP_CLI, &WORDPRESS, &SQLITE_PLUGIN] {
-        ensure_artifact(artifact, &dir.join(artifact.file))?;
+    let artifacts = [&FRANKENPHP, &WP_CLI, &WORDPRESS, &SQLITE_PLUGIN];
+    let mut sizes = Vec::with_capacity(artifacts.len());
+    for artifact in artifacts {
+        let dest = dir.join(artifact.file);
+        let size = if is_current(artifact, &dest)? {
+            fs::metadata(&dest)?.len()
+        } else {
+            remote_size(artifact.url)?
+        };
+        sizes.push(size);
+    }
+    let total: u64 = sizes.iter().sum();
+    let mut finished = 0u64;
+    for (artifact, size) in artifacts.iter().zip(sizes) {
+        let base = finished;
+        ensure_artifact(artifact, &dir.join(artifact.file), &mut |done| {
+            progress(artifact.file, base + done, total)
+        })?;
+        finished += size;
     }
     fs::write(dir.join("unzip.php"), UNZIP_SCRIPT)?;
     Ok(())
 }
 
-fn ensure_artifact(artifact: &Artifact, dest: &Path) -> Result<()> {
-    if dest.exists() && sha256_of(dest)? == artifact.sha256 {
+/// True when every runtime artifact is on disk. Downloads land in a `.part`
+/// file and are renamed only after the hash checks out, so presence is enough.
+pub fn runtime_installed() -> bool {
+    let Ok(dir) = data_runtime_dir() else {
+        return false;
+    };
+    [
+        FRANKENPHP.file,
+        WP_CLI.file,
+        WORDPRESS.file,
+        SQLITE_PLUGIN.file,
+        "unzip.php",
+    ]
+    .iter()
+    .all(|file| dir.join(file).exists())
+}
+
+fn is_current(artifact: &Artifact, dest: &Path) -> Result<bool> {
+    Ok(dest.exists() && sha256_of(dest)? == artifact.sha256)
+}
+
+fn remote_size(url: &str) -> Result<u64> {
+    let response = ureq::head(url)
+        .call()
+        .with_context(|| format!("checking {url}"))?;
+    response
+        .headers()
+        .get("content-length")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse().ok())
+        .with_context(|| format!("no content-length for {url}"))
+}
+
+fn ensure_artifact(artifact: &Artifact, dest: &Path, progress: &mut dyn FnMut(u64)) -> Result<()> {
+    if is_current(artifact, dest)? {
+        progress(fs::metadata(dest)?.len());
         return Ok(());
     }
 
@@ -86,8 +137,19 @@ fn ensure_artifact(artifact: &Artifact, dest: &Path) -> Result<()> {
     let mut response = ureq::get(artifact.url)
         .call()
         .with_context(|| format!("downloading {}", artifact.url))?;
+    let mut reader = response.body_mut().as_reader();
     let mut file = File::create(&partial)?;
-    std::io::copy(&mut response.body_mut().as_reader(), &mut file)?;
+    let mut buffer = vec![0u8; 64 * 1024];
+    let mut written = 0u64;
+    loop {
+        let read = reader.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        file.write_all(&buffer[..read])?;
+        written += read as u64;
+        progress(written);
+    }
     file.flush()?;
     drop(file);
 
@@ -190,7 +252,11 @@ pub fn create(name: &str, port: u16, project: &str) -> Result<SiteInfo> {
     if target.exists() {
         bail!("a site named {name} already exists");
     }
-    ensure_runtime()?;
+    if !runtime_installed() {
+        bail!(
+            "the runtime is not installed; run `kandang runtime install` or download it from the dashboard"
+        );
+    }
 
     fs::create_dir_all(&target)?;
     match build_site(&target, name, port, project) {
