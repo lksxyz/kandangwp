@@ -56,6 +56,8 @@ printf '%s\n' \
 chmod +x "$APPDIR/AppRun"
 chmod -R a+rX "$APPDIR"
 
+# appimagetool runs from a FUSE mount by default; CI runners have no libfuse2.
+export APPIMAGE_EXTRACT_AND_RUN=1
 if ! command -v appimagetool >/dev/null 2>&1; then
   curl -fsSL -o "$WORK/appimagetool.AppImage" \
     https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
