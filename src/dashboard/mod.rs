@@ -143,11 +143,7 @@ impl State {
             let result = provision::ensure_runtime(&mut |file, done, total| {
                 let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner());
                 runtime.file = Some(file.to_string());
-                runtime.percent = Some(if total == 0 {
-                    0
-                } else {
-                    (done * 100 / total).min(100)
-                });
+                runtime.percent = Some((done * 100).checked_div(total).unwrap_or(0).min(100));
             });
             let outcome = match result {
                 Ok(()) => RuntimeStatus {
@@ -407,16 +403,22 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
             provision::port_of(name)?;
             require_runtime(state)?;
             let target = publish::active_target();
-            let dry_run = body
+            let review = body
                 .get("dry_run")
                 .and_then(Value::as_bool)
                 .unwrap_or(false);
-            if dry_run && target == publish::Target::Zip {
-                bail!("a dry run previews Cloudflare publishes only");
-            }
+            let reviewed = body
+                .get("reviewed")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
             let (project, public) = match target {
-                publish::Target::Cloudflare => cloudflare_destination(name, body)?,
-                publish::Target::Zip => (String::new(), zip_destination(name, body)),
+                publish::Target::Cloudflare => {
+                    publish::cloudflare_destination(name, requested_public(body))?
+                }
+                publish::Target::Zip => (
+                    String::new(),
+                    publish::zip_destination(name, requested_public(body)),
+                ),
             };
 
             // A finished job stays readable for the dashboard's result strip;
@@ -424,43 +426,32 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
             if publish_running(state, name) {
                 bail!("publish is already running for {name}");
             }
-            if !dry_run {
-                // Claim the job before the export runs, so the dashboard's
-                // status poll reports the publish as soon as it is accepted.
-                state
-                    .publish
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .insert(name.to_string(), PublishJob::running("starting"));
-            }
-            // Exporting needs the site server. Starting it is part of the
-            // publish and the site stays up afterwards, so the authoring
-            // window the user is working in does not disappear.
-            let setup = (|| -> Result<()> {
+            if review {
+                // The review exports now, so the preview and the plan show what
+                // a confirmed publish sends. Nothing is deployed here.
                 start(state, name)?;
-                publish::export_site(name, &public).map(|_| ())
-            })();
-            if let Err(e) = setup {
-                if !dry_run {
-                    state
-                        .publish
-                        .lock()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .insert(name.to_string(), failed_job(format!("{e:#}")));
-                }
-                return Err(e);
-            }
-
-            if dry_run {
-                let plan = publish::plan(name, &public, &project)?;
+                publish::export_site(name, &public)?;
+                let plan = match target {
+                    publish::Target::Cloudflare => publish::plan(name, &public, &project)?,
+                    publish::Target::Zip => publish::plan_zip(name)?,
+                };
                 return Ok(json!({
                     "dry_run": true,
+                    "target": target,
                     "files": plan.files,
                     "changed": plan.changed,
                     "published": public,
                     "project": project,
+                    "preview": format!("{}/", config::preview_url(name)),
                 }));
             }
+            // Claim the job before the work starts, so the dashboard's status
+            // poll reports the publish as soon as it is accepted.
+            state
+                .publish
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(name.to_string(), PublishJob::running("starting"));
             let state = State::mirror(state);
             let publish_jobs = Arc::clone(&state.publish);
             let job_name = name.to_string();
@@ -475,8 +466,11 @@ fn post(state: &State, segments: &[&str], body: &Value) -> Result<Value> {
                 let outcome = (|| {
                     set_phase("starting");
                     start(&state, &job_name)?;
-                    set_phase("exporting");
-                    publish::export_site(&job_name, &job_public)?;
+                    // A reviewed publish deploys the export the user just saw.
+                    if !reviewed {
+                        set_phase("exporting");
+                        publish::export_site(&job_name, &job_public)?;
+                    }
                     match target {
                         publish::Target::Cloudflare => {
                             set_phase("deploying");
@@ -527,43 +521,8 @@ fn cloudflare_status() -> Value {
     json!({ "connected": crate::cloudflare::connected() })
 }
 
-/// The Cloudflare destination for a site. The project follows the site slug;
-/// the public address is the one Cloudflare assigned unless a custom domain is set.
-fn cloudflare_destination(name: &str, body: &Value) -> Result<(String, String)> {
-    let saved = publish::read_settings(name)?;
-    let project = name.to_string();
-    let mut public = body
-        .get("public")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .unwrap_or_default()
-        .to_string();
-    let guessed = format!("https://{project}.pages.dev");
-    if public.is_empty() || public == guessed {
-        // A guess from before the project existed would 404 forever.
-        public = publish::default_public(&project);
-    }
-    if public != saved.public {
-        publish::write_settings(
-            name,
-            &publish::Settings {
-                public: public.clone(),
-                project: project.clone(),
-            },
-        )?;
-    }
-    Ok((project, public))
-}
-
-/// The zip target has no hosting address; links use the given public address,
-/// or the local gateway address when none is given.
-fn zip_destination(name: &str, body: &Value) -> String {
-    body.get("public")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|public| !public.is_empty())
-        .map(str::to_string)
-        .unwrap_or_else(|| config::gateway_root(name))
+fn requested_public(body: &Value) -> Option<&str> {
+    body.get("public").and_then(Value::as_str)
 }
 
 fn site_detail(name: &str) -> Result<Value> {
@@ -576,7 +535,6 @@ fn site_detail(name: &str) -> Result<Value> {
         "name": name,
         "port": port,
         "url": config::gateway_root(name),
-        "preview_url": exported.then(|| format!("{}/", config::preview_url(name))),
         "running": sites::is_listening(port),
         "exported": exported,
         "cloudflare_connected": crate::cloudflare::connected(),

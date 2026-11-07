@@ -2,6 +2,20 @@
 
 All notable changes to Kandang. Versions follow `Cargo.toml`.
 
+## Unreleased
+
+### Fixed
+- Publishing a site for the first time no longer fails with "nothing exported
+  for <site> yet". The export creates the public folder itself.
+
+### Changed
+- Publish shows a preview of the export in the review dialog before anything
+  is deployed. Deploy (or Write zip, without Cloudflare) sends the export you
+  reviewed, without exporting again.
+- Preview addresses are gone from the sites list, the Overview, and the Publish
+  tab. `kandang site preview` re-exports first, and stops the site again if it
+  had to start it.
+
 ## 0.1.1 — 2026-11-06
 
 ### Added

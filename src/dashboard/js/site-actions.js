@@ -183,7 +183,7 @@
         el('button', { class: 'btn solid', type: 'button', id: 'pub-check', disabled: runtimeReady() ? null : true }, icon('rocket'), 'Publish'),
       ),
     );
-    form.querySelector('#pub-check').addEventListener('click', () => (d.cloudflare_connected ? reviewPublish(d.name) : exportZip(d.name)));
+    form.querySelector('#pub-check').addEventListener('click', () => reviewPublish(d.name));
     if (!d.cloudflare_connected) form.append(el('p', { class: 'hint' }, 'Not connected to Cloudflare: the export is written as a zip. Connect Cloudflare in ', el('a', { href: '#/cloudflare', text: 'Integrations' }), ' to publish online.'));
 
     return el('div', { class: 'panel' },
@@ -261,12 +261,14 @@
   }
 
   async function reviewPublish(name) {
-    const body = { dry_run: true };
-    const plan = await run($('pub-check'), () => api('POST', `/api/sites/${encodeURIComponent(name)}/publish`, body));
+    const plan = await run($('pub-check'), () => api('POST', `/api/sites/${encodeURIComponent(name)}/publish`, { dry_run: true }));
     if (!plan) return;
+    const zip = plan.target === 'zip';
     const dialog = $('dlg-publish');
     const ok = $('dlg-publish-ok');
+    $('dlg-publish-title').textContent = zip ? 'Export as zip' : 'Publish to Cloudflare';
     $('dlg-publish-body').replaceChildren(...publishDialogChildren(plan));
+    ok.replaceChildren(icon('rocket'), zip ? 'Write zip' : 'Deploy');
     ok.hidden = plan.changed === 0;
     const confirmed = await new Promise((resolve) => {
       dialog.addEventListener('close', () => resolve(dialog.returnValue === 'ok'), { once: true });
@@ -277,20 +279,7 @@
     renderPublishProgress({ phase: 'starting' });
     watchPublish(name);
     try {
-      await api('POST', `/api/sites/${encodeURIComponent(name)}/publish`, { ...body, dry_run: false });
-    } catch (e) {
-      if (!$('publish-progress').dataset.phase || $('publish-progress').dataset.phase === 'running') {
-        hidePublishProgress();
-      }
-      showError(e.message);
-    }
-  }
-
-  async function exportZip(name) {
-    renderPublishProgress({ phase: 'starting' });
-    watchPublish(name);
-    try {
-      await api('POST', `/api/sites/${encodeURIComponent(name)}/publish`, {});
+      await api('POST', `/api/sites/${encodeURIComponent(name)}/publish`, { dry_run: false, reviewed: true });
     } catch (e) {
       if (!$('publish-progress').dataset.phase || $('publish-progress').dataset.phase === 'running') {
         hidePublishProgress();

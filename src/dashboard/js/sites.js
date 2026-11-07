@@ -33,7 +33,7 @@
   async function loadSites() {
     state.sites = await api('GET', '/api/sites');
     const running = state.sites.filter((s) => s.running).length;
-    const exported = state.sites.filter((s) => s.preview_url).length;
+    const exported = state.sites.filter((s) => s.exported).length;
     $('count-sites').textContent = state.sites.length ? String(state.sites.length) : '';
     $('sites-summary').textContent = state.sites.length
       ? `${state.sites.length} ${state.sites.length === 1 ? 'site' : 'sites'} · ${running} running · ${exported} exported`
@@ -47,9 +47,6 @@
     for (const site of state.sites) {
       const name = el('a', { href: `#/sites/${encodeURIComponent(site.name)}/overview`, text: site.name });
       const address = el('a', { class: 'address', href: site.url, target: '_blank', rel: 'noopener', text: site.url.replace(/^https?:\/\//, '') }, el('span', { class: 'sr-only', text: ' (opens in a new tab)' }));
-      const preview = site.preview_url
-        ? el('a', { class: 'address', href: site.preview_url, target: '_blank', rel: 'noopener', text: 'preview' }, el('span', { class: 'sr-only', text: ' (opens in a new tab)' }))
-        : null;
       const toggle = el('button', {
         disabled: runtimeReady() ? null : true,
         class: site.running ? 'btn sm outline danger' : 'btn sm solid', type: 'button',
@@ -60,7 +57,7 @@
         statusNode(site.running),
         el('div', { class: 'row-main' },
           el('div', { class: 'row-title' }, name),
-          el('div', { class: 'row-meta' }, address, preview),
+          el('div', { class: 'row-meta' }, address),
         ),
         el('div', { class: 'port', text: `:${site.port}` }),
         el('div', { class: 'row-actions' }, toggle),
@@ -166,12 +163,11 @@
       el('span', { class: 'sr-only', text: ' (opens in a new tab)' }));
   }
 
-  /// Where the last publish landed: the two addresses that exist only once the
-  /// site has been exported and deployed.
+  /// Where the last publish landed: the address it was deployed to, once a
+  /// deploy has happened.
   function lastPublishedRows(d) {
     return [
       fact('Deployed', d.deployed ? addressLink(d.deployed) : missing('Not published yet', null)),
-      fact('Preview', d.preview_url ? addressLink(d.preview_url) : missing('Not exported yet', null)),
     ];
   }
 
@@ -182,7 +178,6 @@
         el('h3', { text: 'Authoring' }),
         el('dl', { class: 'facts' },
           fact('Site address', addressLink(d.url)),
-          fact('Preview', d.preview_url ? addressLink(d.preview_url) : missing('Not exported yet', 'Publish', 'publish')),
           fact('Admin user', el('code', { class: 'address', text: 'admin' })),
           fact('Admin password', adminPasswordCell(d.name)),
         ),

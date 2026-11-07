@@ -46,13 +46,15 @@ again later.
 
 Open the site's Publish tab. The Cloudflare Pages project follows the site name
 (`Project Pemda 01` publishes to `project-pemda-01`), so sign in to Cloudflare
-once, then choose Review and publish.
+once, then choose Publish. The dialog previews the export before anything is deployed.
 
 - The first publish creates the Cloudflare Pages project and uses
   `https://<project>.pages.dev` as the public address. To use your own domain,
   add it in Cloudflare first.
 - Publishing starts the site if it is stopped, exports it, and leaves it
   running.
+- Nothing reaches Cloudflare until you confirm in the review. Deploy uploads the
+  export shown there; without Cloudflare, Write zip saves that same export.
 - Nothing is deployed when the exported files are unchanged.
 
 Credentials: Cloudflare sign-in opens your browser and stores the OAuth session in
@@ -67,7 +69,7 @@ admin passwords stay in the keyring.
 | `kandang open` | Open the dashboard, starting the engine if needed |
 | `kandang site create <name>` | Create a WordPress site |
 | `kandang site serve <name>` | Serve it in the foreground |
-| `kandang site preview <name>` | Preview the last static export |
+| `kandang site preview <name>` | Re-export the site and serve the export locally. A stopped site is started for the export and stopped again afterwards |
 | `kandang export --source … --public … --out …` | Export a running site to a folder |
 | `kandang publish <name> --public … --project …` | Export and deploy |
 | `kandang doctor` | Check runtime, port, systemd, and tray support |

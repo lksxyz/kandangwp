@@ -19,7 +19,7 @@ pub struct SiteSummary {
     pub port: u16,
     pub url: String,
     pub running: bool,
-    pub preview_url: Option<String>,
+    pub exported: bool,
 }
 
 #[derive(Serialize)]
@@ -47,8 +47,7 @@ pub fn list() -> Result<Vec<SiteSummary>> {
             port,
             url: config::gateway_root(&name),
             running: is_listening(port),
-            preview_url: provision::is_exported(&name)
-                .then(|| format!("{}/", config::preview_url(&name))),
+            exported: provision::is_exported(&name),
         });
     }
     sites.sort_by(|a, b| a.name.cmp(&b.name));

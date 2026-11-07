@@ -130,9 +130,9 @@
     }, 1500);
   }
 
-  /// A finished publish changes the deployed address, the preview, and the
-  /// saved project, so the panels holding them are updated without touching
-  /// the rest of the form the user may be editing.
+  /// A finished publish changes the deployed address and the saved project, so
+  /// the panels holding them are updated without touching the rest of the form
+  /// the user may be editing.
   async function refreshAfterPublish(name) {
     const r = route();
     if (r.view !== 'site' || r.name !== name) return;
@@ -250,11 +250,15 @@
   }
 
   function publishDialogChildren(plan) {
+    const zip = plan.target === 'zip';
     const children = [
+      el('iframe', { class: 'publish-preview', src: plan.preview, title: 'Preview of the export' }),
       el('dl', { class: 'facts' },
-        el('div', { class: 'fact' }, el('dt', { text: 'Changed files' }), el('dd', { text: plan.changed === 0 ? 'None' : `${plan.changed} of ${plan.files}` })),
-        el('div', { class: 'fact' }, el('dt', { text: 'Pages project' }), el('dd', { text: plan.project })),
-        el('div', { class: 'fact' }, el('dt', { text: 'Destination' }), el('dd', {}, el('span', { class: 'address', text: plan.published }))),
+        zip
+          ? el('div', { class: 'fact' }, el('dt', { text: 'Files' }), el('dd', { text: String(plan.files) }))
+          : el('div', { class: 'fact' }, el('dt', { text: 'Changed files' }), el('dd', { text: plan.changed === 0 ? 'None' : `${plan.changed} of ${plan.files}` })),
+        zip ? null : el('div', { class: 'fact' }, el('dt', { text: 'Pages project' }), el('dd', { text: plan.project })),
+        el('div', { class: 'fact' }, el('dt', { text: zip ? 'Output' : 'Destination' }), el('dd', {}, el('span', { class: 'address', text: zip ? 'export.zip' : plan.published }))),
       ),
     ];
     if (plan.changed === 0) {
@@ -263,7 +267,9 @@
         el('a', { href: plan.published, target: '_blank', rel: 'noopener' },
           'Open the live site', el('span', { class: 'sr-only', text: ' (opens in a new tab)' }))));
     } else {
-      children.push(el('p', { class: 'hint', style: 'margin:0', text: 'Kandang starts the site if it is not running, exports it, then deploys. The site stays running afterwards, and the result stays at the top of the page.' }));
+      children.push(el('p', { class: 'hint', style: 'margin:0', text: zip
+        ? 'Confirming writes the zip from this export. The site stays running afterwards.'
+        : 'Confirming uploads this export. The site stays running afterwards, and the result stays at the top of the page.' }));
     }
     return children;
   }
