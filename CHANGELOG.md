@@ -2,7 +2,7 @@
 
 All notable changes to Kandang. Versions follow `Cargo.toml`.
 
-## Unreleased
+## 0.1.2 — 2026-11-07
 
 ### Fixed
 - Publishing a site for the first time no longer fails with "nothing exported
