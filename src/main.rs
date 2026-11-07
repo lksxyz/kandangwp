@@ -100,7 +100,7 @@ enum SiteAction {
         /// Site name
         name: String,
     },
-    /// Preview the exported static files on a local port (no deploy)
+    /// Re-export the site and serve the export on a local port (no deploy)
     Preview {
         /// Site name
         name: String,
@@ -186,7 +186,7 @@ fn main() -> Result<()> {
                 }
                 let mut shown: Option<(String, u64)> = None;
                 provision::ensure_runtime(&mut |file, done, total| {
-                    let percent = if total == 0 { 0 } else { done * 100 / total };
+                    let percent = (done * 100).checked_div(total).unwrap_or(0);
                     if shown.as_ref().map(|(f, p)| (f.as_str(), *p)) != Some((file, percent)) {
                         eprint!("\r{percent:>3}%  {file:<24}");
                         shown = Some((file.to_string(), percent));
@@ -224,6 +224,7 @@ fn main() -> Result<()> {
                 Ok(())
             }
             SiteAction::Preview { name } => {
+                publish::refresh_export(&name)?;
                 let (mut server, port) = publish::preview(&name)?;
                 println!(
                     "previewing the static export at http://127.0.0.1:{port}/ (Ctrl-C to stop)"

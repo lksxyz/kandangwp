@@ -82,7 +82,7 @@ pub fn export_site(name: &str, public_base: &str) -> Result<usize> {
     if !sites::is_listening(port) {
         bail!("site {name} is not running");
     }
-    let out = public_dir(name)?;
+    let out = provision::site_dir(name)?.join("public");
     let report = export::export(&export::Options {
         source: Url::parse(&config::gateway_url(name))?,
         public_base: public_base.to_string(),
@@ -180,6 +180,17 @@ pub fn plan(name: &str, public: &str, project: &str) -> Result<Outcome> {
         changed: changed_files(&previous, &current),
         deployed: false,
         target: Target::Cloudflare,
+        location: None,
+    })
+}
+
+pub fn plan_zip(name: &str) -> Result<Outcome> {
+    let files = files_under(&public_dir(name)?)?.len();
+    Ok(Outcome {
+        files,
+        changed: files,
+        deployed: false,
+        target: Target::Zip,
         location: None,
     })
 }
@@ -345,6 +356,61 @@ pub fn preview(name: &str) -> Result<(Child, u16)> {
     let child = command.spawn().context("starting the preview server")?;
     wait_for_port(port)?;
     Ok((child, port))
+}
+
+/// The Cloudflare project and public address for a site. The project follows
+/// the site slug; the public address is the one Cloudflare assigned unless a
+/// custom one is requested or already saved.
+pub fn cloudflare_destination(name: &str, requested: Option<&str>) -> Result<(String, String)> {
+    let saved = read_settings(name)?;
+    let project = name.to_string();
+    let mut public = requested.map(str::trim).unwrap_or_default().to_string();
+    let guessed = format!("https://{project}.pages.dev");
+    if public.is_empty() || public == guessed {
+        // A guess from before the project existed would 404 forever.
+        public = default_public(&project);
+    }
+    if public != saved.public {
+        write_settings(
+            name,
+            &Settings {
+                public: public.clone(),
+                project: project.clone(),
+            },
+        )?;
+    }
+    Ok((project, public))
+}
+
+/// The zip target has no hosting address; links use the requested public
+/// address, or the local gateway address when none is given.
+pub fn zip_destination(name: &str, requested: Option<&str>) -> String {
+    requested
+        .map(str::trim)
+        .filter(|public| !public.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| config::gateway_root(name))
+}
+
+/// Exports the site's current content for `kandang site preview`. A stopped
+/// site is started for the export and stopped again right after, because the
+/// preview serves the exported files and does not need the site running.
+pub fn refresh_export(name: &str) -> Result<()> {
+    let port = provision::port_of(name)?;
+    let mut started = if sites::is_listening(port) {
+        None
+    } else {
+        Some(serve(name, true)?)
+    };
+    let public = match active_target() {
+        Target::Cloudflare => cloudflare_destination(name, None).map(|(_, public)| public),
+        Target::Zip => Ok(zip_destination(name, None)),
+    };
+    let exported = public.and_then(|public| export_site(name, &public));
+    if let Some(child) = started.as_mut() {
+        stop(child);
+    }
+    exported.map(|_| ())
 }
 
 #[cfg(test)]

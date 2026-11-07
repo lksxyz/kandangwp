@@ -475,6 +475,8 @@
   }
   dialog::backdrop { background: rgba(16, 24, 40, 0.5); }
   dialog form, dialog .dialog-body { padding: 24px; display: grid; gap: 16px; }
+  dialog.publish-dialog { width: min(960px, calc(100vw - 32px)); }
+  .publish-preview { display: block; width: 100%; height: min(56vh, 520px); border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
   dialog h2 { margin: 0; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px; }
   .field { display: grid; gap: 6px; }

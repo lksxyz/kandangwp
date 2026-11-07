@@ -56,6 +56,12 @@ without configuration. The engine's gateway routes each Domain to its Site.
 Producing a static copy of a Site's pages, assets, and media from its running
 local version. Export never changes the local Site.
 
+## Preview
+
+The view of a Site's latest Export, shown only inside the Publish review before
+anything is deployed. Preview is never a link in the Dashboard or CLI, and it
+is not a Domain.
+
 ## Publish
 
 Exporting a Site and making the result live at its Public Address.
