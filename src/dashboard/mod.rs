@@ -112,6 +112,15 @@ impl RuntimeStatus {
             percent: None,
         }
     }
+
+    fn ready() -> Self {
+        Self {
+            status: "ready",
+            error: None,
+            file: None,
+            percent: None,
+        }
+    }
 }
 
 impl State {
@@ -213,7 +222,11 @@ impl State {
             token: Arc::new(token),
             servers: Arc::new(Mutex::new(HashMap::new())),
             publish: Arc::new(Mutex::new(HashMap::new())),
-            runtime: Arc::new(Mutex::new(RuntimeStatus::idle())),
+            runtime: Arc::new(Mutex::new(if provision::runtime_installed() {
+                RuntimeStatus::ready()
+            } else {
+                RuntimeStatus::idle()
+            })),
         })
     }
 
